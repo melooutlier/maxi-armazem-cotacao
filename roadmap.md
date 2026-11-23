@@ -1,0 +1,3 @@
+- [ ] Aprovar plano e preparar Lovable Cloud para persistir vistorias.
+- [ ] Construir os modos Campo, Escritório e Histórico & Relatórios com catálogo de Maputo.
+- [ ] Validar conclusão, cópia/exportação e histórico; revisar metadados e estado do projeto.
