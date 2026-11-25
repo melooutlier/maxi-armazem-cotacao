@@ -942,7 +942,7 @@ function Index() {
               </div>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
                 <label className="grid gap-2 text-xs font-semibold uppercase text-muted-foreground">
-                  Supermercado
+                  Empresa
                   <Select value={historyStore} onValueChange={setHistoryStore}>
                     <SelectTrigger className="h-11 bg-card text-sm font-normal normal-case text-foreground">
                       <SelectValue />
@@ -1046,19 +1046,6 @@ function Index() {
         </footer>
       </div>
     </main>
-  );
-}
-
-function Metric({ icon, label, value, note }: { icon: React.ReactNode; label: string; value: string; note: string }) {
-  return (
-    <article className="min-w-0 rounded-md border border-border bg-card p-4 shadow-sm sm:p-5">
-      <div className="flex items-center gap-2 text-muted-foreground">
-        <span className="grid size-8 place-items-center rounded-md bg-muted text-brand-navy">{icon}</span>
-        <h3 className="text-xs font-semibold uppercase">{label}</h3>
-      </div>
-      <p className="mt-4 truncate font-display text-2xl font-semibold text-foreground" title={value}>{value}</p>
-      <p className="mt-1 truncate text-xs text-muted-foreground" title={note}>{note}</p>
-    </article>
   );
 }
 
