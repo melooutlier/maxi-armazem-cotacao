@@ -111,6 +111,7 @@ function Index() {
   const [searchText, setSearchText] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<CatalogProduct | null>(null);
   const [quantityText, setQuantityText] = useState("1");
+  const [isPriority, setIsPriority] = useState<boolean | null>(null);
   const [clock, setClock] = useState<Date | null>(null);
 
   useEffect(() => {
@@ -231,10 +232,10 @@ function Index() {
   });
 
   const startVisitMutation = useMutation({
-    mutationFn: async ({ supermarket, operator }: { supermarket: string; operator: string }) => {
+    mutationFn: async ({ supermarket, operator, priority }: { supermarket: string; operator: string; priority: boolean }) => {
       const { data: visit, error } = await supabase
         .from("visits")
-        .insert({ supermarket, operator_name: operator, status: "in_progress", is_priority: false })
+        .insert({ supermarket, operator_name: operator, status: "in_progress", is_priority: priority })
         .select()
         .single();
       if (error) throw error;
@@ -390,6 +391,21 @@ function Index() {
     ? data.items.filter((item) => item.visit_id === officeVisit.id)
     : [];
 
+  const isVisitFullyLaunched = (visit: Visit) => {
+    const items = data.items.filter((item) => item.visit_id === visit.id);
+    return visit.status === "launched" || (items.length > 0 && items.every((item) => item.launched));
+  };
+  const fieldPendingVisits = data.visits.filter((visit) => visit.status === "completed" && !isVisitFullyLaunched(visit));
+  const fieldCompletedVisits = data.visits.filter((visit) => visit.status !== "in_progress" && isVisitFullyLaunched(visit));
+  const openVisitInOffice = (visit: Visit) => {
+    setOfficeCompany(visit.supermarket);
+    setOfficeEntered(true);
+    setOfficeDateFrom("");
+    setOfficeDateTo("");
+    setOfficeVisitId(visit.id);
+    setMode("office");
+  };
+
   const historyVisits = data.visits.filter((visit) => {
     const visitDay = localDateValue(visit.started_at);
     const matchesStore = historyStore === "all" || visit.supermarket === historyStore;
@@ -408,7 +424,7 @@ function Index() {
       toast.error("Não foi possível identificar o utilizador autenticado.");
       return;
     }
-    startVisitMutation.mutate({ supermarket: selectedStore, operator });
+    startVisitMutation.mutate({ supermarket: selectedStore, operator, priority: isPriority === true });
   };
 
   const handleAddItem = () => {
