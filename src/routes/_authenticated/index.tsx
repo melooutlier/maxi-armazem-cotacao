@@ -22,7 +22,6 @@ import {
   Search,
   Store,
   Trash2,
-  TrendingUp,
 } from "lucide-react";
 import { toast } from "sonner";
 
