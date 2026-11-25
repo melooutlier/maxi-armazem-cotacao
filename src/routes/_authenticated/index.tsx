@@ -10,15 +10,12 @@ import {
   CheckCircle2,
   ClipboardCheck,
   ClipboardList,
-  Clock3,
   Copy,
-  Download,
   History,
   MapPin,
   Minus,
   Package,
   Plus,
-  Printer,
   Search,
   Store,
   Trash2,
@@ -41,13 +38,10 @@ import {
   PRIORITIES,
   PRODUCT_CATALOG,
   QUANTITY_PRESETS,
-  SUPERMARKETS,
   addQuantity,
   canCompleteVisit,
-  durationInMinutes,
   fieldVisitQueryOptions,
   formatDateTime,
-  formatDuration,
   localDateValue,
   type CatalogProduct,
   type Priority,
@@ -809,7 +803,7 @@ function Index() {
             <>
             <div className="no-print flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-end sm:justify-between">
               <label className="grid w-full max-w-xl gap-2 text-sm font-medium">
-                Empresa / vistoria para lançamento
+                Vistoria para lançamento
                 <Select value={officeVisit?.id ?? "none"} onValueChange={setOfficeVisitId}>
                   <SelectTrigger className="h-12 bg-card">
                     <SelectValue placeholder="Selecione uma vistoria" />
