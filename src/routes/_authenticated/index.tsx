@@ -1170,7 +1170,7 @@ function Index() {
               />
             )}
             </>
-            )}
+            ) : null}
           </section>
         ) : null}
 
