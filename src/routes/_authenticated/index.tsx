@@ -102,7 +102,6 @@ function Index() {
   const [editingCompanyName, setEditingCompanyName] = useState("");
   const [editingCompanyActive, setEditingCompanyActive] = useState(true);
   const [companyToDelete, setCompanyToDelete] = useState<{ id: string; name: string } | null>(null);
-  const [officeCompany, setOfficeCompany] = useState("");
   const [officeEntered, setOfficeEntered] = useState(false);
   const [showCompletedVisits, setShowCompletedVisits] = useState(false);
   const [officeDateFrom, setOfficeDateFrom] = useState("");
@@ -1167,7 +1166,7 @@ function Index() {
               <EmptyState
                 icon={<ClipboardList className="size-6" aria-hidden="true" />}
                 title="Nenhuma vistoria para lançar"
-                description={`Ainda não existem vistorias concluídas para ${officeCompany}.`}
+                description="Ainda não existem vistorias concluídas disponíveis para lançamento."
               />
             )}
             </>
