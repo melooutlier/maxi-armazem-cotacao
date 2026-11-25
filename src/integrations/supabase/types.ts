@@ -14,27 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      companies: {
-        Row: {
-          active: boolean
-          created_at: string
-          id: string
-          name: string
-        }
-        Insert: {
-          active?: boolean
-          created_at?: string
-          id?: string
-          name: string
-        }
-        Update: {
-          active?: boolean
-          created_at?: string
-          id?: string
-          name?: string
-        }
-        Relationships: []
-      }
       user_roles: {
         Row: {
           id: string
@@ -57,7 +36,6 @@ export type Database = {
         Row: {
           category: string
           created_at: string
-          discount_percent: number
           id: string
           launched: boolean
           priority: string
@@ -70,7 +48,6 @@ export type Database = {
         Insert: {
           category: string
           created_at?: string
-          discount_percent?: number
           id?: string
           launched?: boolean
           priority?: string
@@ -83,7 +60,6 @@ export type Database = {
         Update: {
           category?: string
           created_at?: string
-          discount_percent?: number
           id?: string
           launched?: boolean
           priority?: string
@@ -107,7 +83,6 @@ export type Database = {
         Row: {
           completed_at: string | null
           created_at: string
-          discount_percent: number
           id: string
           operator_name: string
           started_at: string
@@ -119,7 +94,6 @@ export type Database = {
         Insert: {
           completed_at?: string | null
           created_at?: string
-          discount_percent?: number
           id?: string
           operator_name: string
           started_at?: string
@@ -131,7 +105,6 @@ export type Database = {
         Update: {
           completed_at?: string | null
           created_at?: string
-          discount_percent?: number
           id?: string
           operator_name?: string
           started_at?: string
