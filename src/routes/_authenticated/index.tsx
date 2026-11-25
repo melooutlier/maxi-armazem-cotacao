@@ -97,6 +97,7 @@ function Index() {
   const [historyStore, setHistoryStore] = useState("all");
   const [historyStatus, setHistoryStatus] = useState<"all" | "pending" | "completed">("all");
   const [companyName, setCompanyName] = useState("");
+  const [cadastroSection, setCadastroSection] = useState(false);
   const [officeCompany, setOfficeCompany] = useState("");
   const [officeEntered, setOfficeEntered] = useState(false);
   const [dateFrom, setDateFrom] = useState("");
@@ -460,7 +461,7 @@ function Index() {
               <button
                 key={id}
                 type="button"
-                onClick={() => { setMode(id); if (id === "office") { setOfficeEntered(false); setOfficeCompany(""); setOfficeVisitId(""); } }}
+                onClick={() => { setMode(id); if (id === "office") { setOfficeEntered(false); setOfficeCompany(""); setOfficeVisitId(""); } if (id === "cadastro") setCadastroSection(false); }}
                 className="group flex min-h-56 flex-col items-start justify-between rounded-xl border border-border bg-card p-7 text-left shadow-sm transition hover:-translate-y-1 hover:border-brand-green hover:shadow-md"
               >
                 <span className="grid size-14 place-items-center rounded-xl bg-brand-green/15 text-brand-navy">
@@ -915,7 +916,14 @@ function Index() {
         ) : null}
 
         {mode === "cadastro" ? (
-          <section className="mx-auto max-w-3xl space-y-6">
+          <section className="mx-auto max-w-5xl space-y-6">
+            {!cadastroSection ? (
+              <button type="button" onClick={() => setCadastroSection(true)} className="group flex min-h-52 w-full max-w-sm flex-col items-start justify-between rounded-xl border border-border bg-card p-7 text-left shadow-sm transition hover:-translate-y-1 hover:border-brand-green hover:shadow-md">
+                <span className="grid size-14 place-items-center rounded-xl bg-brand-green/15 text-brand-navy"><Store className="size-7" /></span>
+                <span><span className="block font-display text-2xl font-semibold">Cadastro de empresa</span><span className="mt-2 block text-sm text-muted-foreground">Adicionar uma empresa à lista de vistorias.</span></span>
+                <span className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-brand-navy">Aceder <ArrowRight className="size-4" /></span>
+              </button>
+            ) : (
             <div className="rounded-md border border-border bg-card p-5 shadow-sm sm:p-7">
               <div className="mb-5 flex items-center gap-3">
                 <span className="grid size-11 place-items-center rounded-md bg-brand-green/15 text-brand-navy"><Store className="size-5" /></span>
@@ -927,6 +935,7 @@ function Index() {
               </form>
               <div className="mt-6 space-y-2"><h3 className="text-sm font-semibold">Empresas disponíveis</h3>{companies.map((company) => <div key={company} className="rounded-md border border-border px-4 py-3 text-sm">{company}</div>)}</div>
             </div>
+            )}
           </section>
         ) : null}
 
