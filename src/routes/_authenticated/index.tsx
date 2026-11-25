@@ -104,6 +104,8 @@ function Index() {
   const [companyToDelete, setCompanyToDelete] = useState<{ id: string; name: string } | null>(null);
   const [officeCompany, setOfficeCompany] = useState("");
   const [officeEntered, setOfficeEntered] = useState(false);
+  const [officeDateFrom, setOfficeDateFrom] = useState("");
+  const [officeDateTo, setOfficeDateTo] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [searchText, setSearchText] = useState("");
@@ -375,7 +377,13 @@ function Index() {
 
   const activeCompanies = data.companies.filter((company) => company.active);
   const companies = activeCompanies.map((company) => company.name);
-  const officeVisits = data.visits.filter((visit) => visit.status !== "in_progress" && (!officeEntered || visit.supermarket === officeCompany));
+  const officeVisits = data.visits.filter((visit) => {
+    const visitDay = localDateValue(visit.started_at);
+    return visit.status !== "in_progress" &&
+      (!officeEntered || visit.supermarket === officeCompany) &&
+      (!officeDateFrom || visitDay >= officeDateFrom) &&
+      (!officeDateTo || visitDay <= officeDateTo);
+  });
   const officeVisit =
     officeVisits.find((visit) => visit.id === officeVisitId) ?? officeVisits[0] ?? null;
   const officeItems = officeVisit
@@ -949,19 +957,51 @@ function Index() {
         {mode === "office" ? (
           <section className="space-y-6">
             {!officeEntered ? (
-              <div className="mx-auto max-w-2xl rounded-md border border-border bg-card p-6 shadow-sm sm:p-8">
-                <div className="mb-5 flex items-center gap-3"><span className="grid size-11 place-items-center rounded-md bg-brand-green/15 text-brand-navy"><Store className="size-5" /></span><div><h2 className="font-display text-xl font-semibold">Escolher empresa</h2><p className="text-sm text-muted-foreground">Seleccione a empresa cujos lançamentos pretende tratar.</p></div></div>
-                <label className="grid gap-2 text-sm font-medium">Empresa
-                  <Select value={officeCompany} onValueChange={setOfficeCompany}>
-                    <SelectTrigger className="h-12 bg-background"><SelectValue placeholder="Seleccione a empresa" /></SelectTrigger>
-                    <SelectContent>{companies.map((company) => <SelectItem key={company} value={company}>{company}</SelectItem>)}</SelectContent>
-                  </Select>
-                </label>
-                <Button type="button" className="mt-5 h-12 w-full" disabled={!officeCompany} onClick={() => { setOfficeEntered(true); const firstVisit = data.visits.find((visit) => visit.supermarket === officeCompany && visit.status !== "in_progress"); setOfficeVisitId(firstVisit?.id ?? ""); }}>Entrar <ArrowRight /></Button>
+              <div className="space-y-5">
+                <div>
+                  <h2 className="font-display text-xl font-semibold">Empresas</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">Seleccione uma empresa para consultar as vistorias disponíveis para lançamento.</p>
+                </div>
+                {activeCompanies.length === 0 ? (
+                  <div className="rounded-md border border-dashed border-border bg-card p-8 text-center text-sm text-muted-foreground">Ainda não existem empresas cadastradas.</div>
+                ) : (
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {activeCompanies.map((company) => (
+                      <button key={company.id} type="button" onClick={() => {
+                        setOfficeCompany(company.name);
+                        setOfficeEntered(true);
+                        setOfficeVisitId("");
+                        setOfficeDateFrom("");
+                        setOfficeDateTo("");
+                      }} className="flex min-h-28 items-center justify-between rounded-xl border border-border bg-card p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-brand-green hover:shadow-md">
+                        <span className="flex min-w-0 items-center gap-3">
+                          <span className="grid size-11 shrink-0 place-items-center rounded-lg bg-brand-green/15 text-brand-navy"><Store className="size-5" /></span>
+                          <span className="truncate font-semibold">{company.name}</span>
+                        </span>
+                        <ArrowRight className="size-5 shrink-0 text-muted-foreground" />
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             ) : (
             <>
-            <div className="no-print flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-end sm:justify-between">
+            <div className="no-print space-y-4 border-b border-border pb-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase text-muted-foreground">Empresa seleccionada</p>
+                  <h2 className="font-display text-xl font-semibold">{officeCompany}</h2>
+                </div>
+                <Button type="button" variant="outline" onClick={() => { setOfficeEntered(false); setOfficeVisitId(""); }}>Voltar à lista de empresas</Button>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="grid gap-2 text-sm font-medium">Data inicial
+                  <Input type="date" value={officeDateFrom} onChange={(event) => { setOfficeDateFrom(event.target.value); setOfficeVisitId(""); }} className="h-11 bg-card" />
+                </label>
+                <label className="grid gap-2 text-sm font-medium">Data final
+                  <Input type="date" value={officeDateTo} onChange={(event) => { setOfficeDateTo(event.target.value); setOfficeVisitId(""); }} className="h-11 bg-card" />
+                </label>
+              </div>
               <label className="grid w-full max-w-xl gap-2 text-sm font-medium">
                 Vistoria para lançamento
                 <Select value={officeVisit?.id ?? "none"} onValueChange={setOfficeVisitId}>
