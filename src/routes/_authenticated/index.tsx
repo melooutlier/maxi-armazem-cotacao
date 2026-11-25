@@ -439,7 +439,7 @@ function Index() {
 
           <div className="hidden items-center gap-3 lg:flex">
             <div className="text-right">
-              <p className="text-sm font-medium">{operatorName.trim() || "Gestor responsável"}</p>
+              <p className="text-sm font-medium">{operatorName.trim() || "Utilizador autenticado"}</p>
               <p className="text-xs text-brand-navy-foreground/70">
                 {clock
                   ? new Intl.DateTimeFormat("pt-MZ", {
