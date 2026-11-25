@@ -74,7 +74,7 @@ export const fieldVisitQueryOptions = queryOptions({
     const [visitsResult, itemsResult, companiesResult] = await Promise.all([
       supabase.from("visits").select("*").order("started_at", { ascending: false }),
       supabase.from("visit_items").select("*").order("created_at", { ascending: true }),
-      supabase.from("companies").select("*").eq("active", true).order("name", { ascending: true }),
+      supabase.from("companies").select("*").order("name", { ascending: true }),
     ]);
 
     if (visitsResult.error) throw visitsResult.error;
