@@ -5,6 +5,7 @@ import {
   Activity,
   ArrowRight,
   Boxes,
+  Building2,
   CalendarDays,
   Check,
   CheckCircle2,
@@ -41,7 +42,6 @@ import {
   PRIORITIES,
   PRODUCT_CATALOG,
   QUANTITY_PRESETS,
-  SUPERMARKETS,
   addQuantity,
   canCompleteVisit,
   durationInMinutes,
@@ -57,7 +57,7 @@ import {
 } from "@/lib/field-visits";
 import { supabase } from "@/integrations/supabase/client";
 
-type ViewMode = "menu" | "field" | "office" | "history";
+type ViewMode = "menu" | "field" | "office" | "history" | "companies";
 
 export const Route = createFileRoute("/_authenticated/")({
   loader: ({ context }) => context.queryClient.ensureQueryData(fieldVisitQueryOptions),
@@ -84,6 +84,7 @@ const MODES: { id: ViewMode; label: string; icon: typeof MapPin }[] = [
   { id: "field", label: "Campo", icon: MapPin },
   { id: "office", label: "Escritório", icon: ClipboardList },
   { id: "history", label: "Histórico", icon: History },
+  { id: "companies", label: "Empresas", icon: Building2 },
 ];
 
 const priorityStyles: Record<Priority, string> = {
@@ -109,6 +110,7 @@ function Index() {
   const [selectedProduct, setSelectedProduct] = useState<CatalogProduct | null>(null);
   const [quantityText, setQuantityText] = useState("1");
   const [priority, setPriority] = useState<Priority | null>(null);
+  const [companyName, setCompanyName] = useState("");
   const [clock, setClock] = useState<Date | null>(null);
 
   useEffect(() => {
@@ -147,6 +149,53 @@ function Index() {
   const activeItems = activeVisit
     ? data.items.filter((item) => item.visit_id === activeVisit.id)
     : [];
+
+  const createCompanyMutation = useMutation({
+    mutationFn: async (name: string) => {
+      const { data: company, error } = await supabase.from("companies").insert({ name }).select().single();
+      if (error) throw error;
+      return company;
+    },
+    onSuccess: (company) => {
+      queryClient.setQueryData(fieldVisitQueryOptions.queryKey, (current: typeof data | undefined) =>
+        current ? { ...current, companies: [...current.companies, company].sort((a, b) => a.name.localeCompare(b.name, "pt-MZ")) } : current,
+      );
+      setSelectedStore(company.name);
+      setCompanyName("");
+      toast.success("Empresa cadastrada com sucesso.");
+    },
+    onError: (error) => toast.error(error.message.includes("companies_name_key") ? "Já existe uma empresa com esse nome." : `Não foi possível cadastrar a empresa: ${error.message}`),
+  });
+
+  const discountMutation = useMutation({
+    mutationFn: async ({ visitId, discount }: { visitId: string; discount: number }) => {
+      const { data: visit, error } = await supabase.from("visits").update({ discount_percent: discount }).eq("id", visitId).select().single();
+      if (error) throw error;
+      return visit;
+    },
+    onSuccess: (savedVisit) => {
+      queryClient.setQueryData(fieldVisitQueryOptions.queryKey, (current: typeof data | undefined) =>
+        current ? { ...current, visits: current.visits.map((visit) => visit.id === savedVisit.id ? savedVisit : visit) } : current,
+      );
+      toast.success("Desconto geral actualizado.");
+    },
+    onError: (error) => toast.error(`Não foi possível guardar o desconto geral: ${error.message}`),
+  });
+
+  const itemDiscountMutation = useMutation({
+    mutationFn: async ({ itemId, discount }: { itemId: string; discount: number }) => {
+      const { data: item, error } = await supabase.from("visit_items").update({ discount_percent: discount }).eq("id", itemId).select().single();
+      if (error) throw error;
+      return item;
+    },
+    onSuccess: (savedItem) => {
+      queryClient.setQueryData(fieldVisitQueryOptions.queryKey, (current: typeof data | undefined) =>
+        current ? { ...current, items: current.items.map((item) => item.id === savedItem.id ? savedItem : item) } : current,
+      );
+      toast.success("Desconto do produto actualizado.");
+    },
+    onError: (error) => toast.error(`Não foi possível guardar o desconto do produto: ${error.message}`),
+  });
 
   const startVisitMutation = useMutation({
     mutationFn: async ({ supermarket, operator }: { supermarket: string; operator: string }) => {
@@ -192,6 +241,7 @@ function Index() {
             unit: input.product.unit,
             quantity: input.quantity,
             priority: input.priority ?? "",
+            discount_percent: 0,
           }).select().single();
       if (result.error) throw result.error;
       return result.data as VisitItem;
@@ -367,9 +417,9 @@ function Index() {
   const handleCopyAll = () => {
     if (!officeVisit) return;
     const lines = [
-      ["Código do produto", "Nome/descrição", "Quantidade em falta", "Prioridade"].join("\t"),
+      ["Código do produto", "Nome/descrição", "Quantidade em falta", "Prioridade", "Desconto individual (%)", "Desconto geral (%)"].join("\t"),
       ...officeItems.map((item) =>
-        [item.product_code, item.product_name, item.quantity, item.priority || ""].join("\t"),
+        [item.product_code, item.product_name, item.quantity, item.priority || "", item.discount_percent, officeVisit.discount_percent].join("\t"),
       ),
     ];
     void handleCopy(lines.join("\n"), "Lista copiada para o lançamento.");
@@ -387,6 +437,8 @@ function Index() {
         "Quantidade em falta",
         "Unidade",
         "Prioridade",
+        "Desconto individual (%)",
+        "Desconto geral (%)",
         "Lançado no ERP",
       ].map(quote),
       ...officeItems.map((item) =>
@@ -398,6 +450,8 @@ function Index() {
           item.quantity,
           item.unit,
           item.priority || "",
+          item.discount_percent,
+          officeVisit.discount_percent,
           item.launched ? "Sim" : "Não",
         ].map(quote),
       ),
@@ -485,7 +539,7 @@ function Index() {
               Sistema de gestão flexível
             </p>
             <h1 className="font-display text-3xl font-semibold tracking-normal text-foreground sm:text-4xl">
-              {mode === "menu" ? "Área de trabalho" : mode === "field" ? "Vistoria em campo" : mode === "office" ? "Lançamento no escritório" : "Histórico & relatórios"}
+              {mode === "menu" ? "Área de trabalho" : mode === "field" ? "Vistoria em campo" : mode === "office" ? "Lançamento no escritório" : mode === "companies" ? "Cadastro de empresas" : "Histórico & relatórios"}
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
               {mode === "menu"
@@ -494,7 +548,9 @@ function Index() {
                   ? (fieldStarted || activeVisit ? "Pesquise os produtos no catálogo e registe as faltas da empresa." : "Escolha a empresa para iniciar uma nova vistoria.")
                   : mode === "office"
                     ? "Transfira os pedidos para o sistema central e acompanhe cada lançamento."
-                    : "Acompanhe o ritmo das vistorias e as reposições pendentes."}
+                    : mode === "companies"
+                      ? "Cadastre as empresas para as quais a Maxi Armazém realiza vistorias e descontos."
+                      : "Acompanhe o ritmo das vistorias e as reposições pendentes."}
             </p>
           </div>
           {mode === "field" && activeVisit ? (
@@ -506,7 +562,7 @@ function Index() {
         </div>
 
         {mode === "menu" ? (
-          <section className="mx-auto grid max-w-5xl gap-5 py-8 md:grid-cols-3">
+          <section className="mx-auto grid max-w-6xl gap-5 py-8 sm:grid-cols-2 xl:grid-cols-4">
             {MODES.map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
@@ -520,7 +576,7 @@ function Index() {
                 <span>
                   <span className="block font-display text-2xl font-semibold">{label}</span>
                   <span className="mt-2 block text-sm text-muted-foreground">
-                    {id === "field" ? "Iniciar e registar uma vistoria nas lojas." : id === "office" ? "Consultar listas e preparar lançamentos." : "Consultar vistorias e indicadores anteriores."}
+                    {id === "field" ? "Iniciar e registar uma vistoria nas lojas." : id === "office" ? "Consultar listas e preparar lançamentos." : id === "history" ? "Consultar vistorias e indicadores anteriores." : "Cadastrar e gerir as empresas onde são feitas as vistorias."}
                   </span>
                 </span>
                 <span className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-brand-navy">
@@ -528,6 +584,25 @@ function Index() {
                 </span>
               </button>
             ))}
+          </section>
+        ) : null}
+
+        {mode === "companies" ? (
+          <section className="mx-auto max-w-4xl space-y-6">
+            <div className="rounded-xl border border-border bg-card p-5 shadow-sm sm:p-7">
+              <div className="flex items-center gap-3">
+                <span className="grid size-12 place-items-center rounded-xl bg-brand-green/15 text-brand-navy"><Building2 className="size-6" aria-hidden="true" /></span>
+                <div><h2 className="font-display text-xl font-semibold">Cadastrar nova empresa</h2><p className="mt-1 text-sm text-muted-foreground">As empresas cadastradas ficam disponíveis na selecção antes de iniciar uma vistoria.</p></div>
+              </div>
+              <form className="mt-6 flex flex-col gap-3 sm:flex-row" onSubmit={(event) => { event.preventDefault(); const name = companyName.trim(); if (!name) return; createCompanyMutation.mutate(name); }}>
+                <Input value={companyName} onChange={(event) => setCompanyName(event.target.value)} placeholder="Nome da empresa" aria-label="Nome da empresa" className="h-12 bg-background" maxLength={120} />
+                <Button type="submit" disabled={!companyName.trim() || createCompanyMutation.isPending} className="h-12 shrink-0 bg-brand-green text-brand-green-foreground hover:bg-brand-green/90"><Plus aria-hidden="true" />{createCompanyMutation.isPending ? "A cadastrar…" : "Cadastrar empresa"}</Button>
+              </form>
+            </div>
+            <div className="rounded-xl border border-border bg-card p-5 shadow-sm sm:p-7">
+              <div className="flex items-center justify-between gap-3 border-b border-border pb-4"><div><h2 className="font-display text-xl font-semibold">Empresas cadastradas</h2><p className="mt-1 text-sm text-muted-foreground">Empresas disponíveis para novas vistorias.</p></div><Badge variant="secondary">{data.companies.length}</Badge></div>
+              <div className="divide-y divide-border">{data.companies.length ? data.companies.map((company) => <div key={company.id} className="flex items-center gap-3 py-4"><span className="grid size-10 place-items-center rounded-lg bg-muted text-brand-navy"><Store className="size-5" aria-hidden="true" /></span><span className="min-w-0 flex-1 truncate text-sm font-medium">{company.name}</span><Badge variant="outline">Activa</Badge></div>) : <p className="py-8 text-center text-sm text-muted-foreground">Ainda não existem empresas cadastradas.</p>}</div>
+            </div>
           </section>
         ) : null}
 
@@ -551,8 +626,8 @@ function Index() {
                         <SelectValue placeholder="Escolha a empresa" />
                       </SelectTrigger>
                       <SelectContent>
-                        {SUPERMARKETS.map((store) => (
-                          <SelectItem key={store} value={store}>{store}</SelectItem>
+                        {data.companies.map((company) => (
+                          <SelectItem key={company.id} value={company.name}>{company.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -643,7 +718,6 @@ function Index() {
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold">{selectedProduct.name}</p>
                       <p className="text-xs text-muted-foreground">{selectedProduct.code} · {selectedProduct.category}</p>
-                      <p className="mt-1 text-xs font-semibold">Stock disponível: {selectedProduct.stock} unidades</p>
                       <p className="mt-1 text-xs font-semibold">Stock disponível: {selectedProduct.stock} unidades</p>
                     </div>
                     <Badge variant="outline" className={getStockLevel(selectedProduct.stock) === "very-low" ? "border-red-200 bg-red-50 text-red-700" : getStockLevel(selectedProduct.stock) === "low" ? "border-amber-200 bg-amber-50 text-amber-700" : "border-green-200 bg-green-50 text-green-700"}>
@@ -740,6 +814,16 @@ function Index() {
               </div>
 
               {activeVisit ? (
+                <div className="mt-4 rounded-lg border border-brand-green/30 bg-brand-green/5 p-4">
+                  <label className="flex flex-col gap-2 text-sm font-semibold sm:flex-row sm:items-center sm:justify-between">
+                    <span>Desconto geral para todos os produtos</span>
+                    <span className="flex items-center gap-2"><Input key={activeVisit.id + String(activeVisit.discount_percent)} type="number" min="0" max="100" step="0.01" defaultValue={activeVisit.discount_percent} aria-label="Desconto geral em percentagem" className="h-10 w-28 bg-background text-right tabular-nums" onBlur={(event) => { const discount = Number(event.currentTarget.value || 0); if (Number.isFinite(discount) && discount >= 0 && discount <= 100 && discount !== activeVisit.discount_percent) discountMutation.mutate({ visitId: activeVisit.id, discount }); else if (!Number.isFinite(discount) || discount < 0 || discount > 100) { event.currentTarget.value = String(activeVisit.discount_percent); toast.error("O desconto deve estar entre 0% e 100%."); } }} /><span>%</span></span>
+                  </label>
+                  <p className="mt-1 text-xs text-muted-foreground">Este desconto é aplicado a todos os produtos. Pode acrescentar um desconto específico em cada produto abaixo.</p>
+                </div>
+              ) : null}
+
+              {activeVisit ? (
                 <div className="mt-2 divide-y divide-border">
                   {activeItems.length === 0 ? (
                     <div className="grid min-h-56 place-items-center py-8 text-center">
@@ -760,6 +844,10 @@ function Index() {
                             {item.priority ? <Badge className={`px-2 py-0.5 ${priorityStyles[item.priority as Priority] ?? priorityStyles.Normal}`}>{item.priority}</Badge> : null}
                           </div>
                           <p className="mt-1 text-xs text-muted-foreground">{item.product_code} · {item.category}</p>
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                            <label className="inline-flex items-center gap-2 text-xs font-medium text-muted-foreground">Desconto individual <Input key={item.id + String(item.discount_percent)} type="number" min="0" max="100" step="0.01" defaultValue={item.discount_percent} aria-label={`Desconto individual de ${item.product_name} em percentagem`} className="h-9 w-20 bg-background text-right tabular-nums" onBlur={(event) => { const discount = Number(event.currentTarget.value || 0); if (Number.isFinite(discount) && discount >= 0 && discount <= 100 && discount !== item.discount_percent) itemDiscountMutation.mutate({ itemId: item.id, discount }); else if (!Number.isFinite(discount) || discount < 0 || discount > 100) { event.currentTarget.value = String(item.discount_percent); toast.error("O desconto deve estar entre 0% e 100%."); } }} /> %</label>
+                            <span className="text-xs font-semibold text-success">Desconto total aplicado: {(100 * (1 - (1 - (activeVisit?.discount_percent ?? 0) / 100) * (1 - item.discount_percent / 100))).toLocaleString("pt-MZ", { maximumFractionDigits: 2 })}%</span>
+                          </div>
                         </div>
                         <div className="flex items-center justify-between gap-3 sm:justify-end">
                           <div className="flex items-center gap-1 rounded-md border border-border p-1">
@@ -882,6 +970,7 @@ function Index() {
                     <p className="text-xs font-semibold uppercase text-muted-foreground">Guia de separação</p>
                     <h2 className="mt-1 font-display text-2xl font-semibold">{officeVisit.supermarket}</h2>
                     <p className="mt-1 text-sm text-muted-foreground">{officeVisit.visit_code} · {formatDateTime(officeVisit.started_at)} · {officeVisit.operator_name}</p>
+                    <p className="mt-1 text-sm font-semibold text-success">Desconto geral da empresa: {officeVisit.discount_percent}%</p>
                   </div>
                   <Badge className={officeVisit.status === "launched" ? "border-success/20 bg-success/10 text-success" : "border-warning/20 bg-warning/10 text-warning-foreground"}>
                     {officeVisit.status === "launched" ? "Lançamento concluído" : "Lançamento pendente"}
@@ -906,7 +995,7 @@ function Index() {
                           <td className="whitespace-nowrap px-4 py-4 font-mono text-xs">{item.product_code}</td>
                           <td className="px-4 py-4">
                             <p className={`font-medium ${item.launched ? "line-through" : ""}`}>{item.product_name}</p>
-                            <p className="mt-1 text-xs text-muted-foreground">{item.category}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">{item.category}</p><p className="mt-1 text-xs text-success">Desconto individual: {item.discount_percent}% · Desconto total aplicado: {(100 * (1 - (1 - officeVisit.discount_percent / 100) * (1 - item.discount_percent / 100))).toLocaleString("pt-MZ", { maximumFractionDigits: 2 })}%</p>
                           </td>
                           <td className="whitespace-nowrap px-4 py-4 font-semibold tabular-nums">{item.quantity} {item.unit}</td>
                           <td className="px-4 py-4">
@@ -997,7 +1086,7 @@ function Index() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todos os supermercados</SelectItem>
-                      {SUPERMARKETS.map((store) => <SelectItem key={store} value={store}>{store}</SelectItem>)}
+                      {data.companies.map((company) => <SelectItem key={company.id} value={company.name}>{company.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </label>
