@@ -93,7 +93,7 @@ function Index() {
   const [completionChoiceOpen, setCompletionChoiceOpen] = useState(false);
   const [completionConfirmOpen, setCompletionConfirmOpen] = useState(false);
   const [stockWarningProduct, setStockWarningProduct] = useState<CatalogProduct | null>(null);
-  const [isPriority, setIsPriority] = useState(false);
+  const [isPriority, setIsPriority] = useState<boolean | null>(null);
   const [selectedStore, setSelectedStore] = useState<string>("VIP Spar Sommerschield");
   const [operatorName, setOperatorName] = useState("Utilizador autenticado");
   const [selectedVisitId, setSelectedVisitId] = useState<string | null>(null);
@@ -375,7 +375,11 @@ function Index() {
   const handleStartVisit = () => {
     const operator = operatorName.trim();
     if (!operator) {
-      toast.error("Informe o nome do gestor responsável.");
+      toast.error("Não foi possível identificar o utilizador autenticado.");
+      return;
+    }
+    if (isPriority === null) {
+      toast.error("Indique se a empresa é prioritária ou não.");
       return;
     }
     startVisitMutation.mutate({ supermarket: selectedStore, operator, isPriority });
@@ -574,7 +578,7 @@ function Index() {
               <button
                 key={id}
                 type="button"
-                onClick={() => { setMode(id); if (id === "field") { setFieldStarted(false); setIsPriority(false); } }}
+                onClick={() => { setMode(id); if (id === "field") { setFieldStarted(false); setIsPriority(null); } }}
                 className="group flex min-h-56 flex-col items-start justify-between rounded-xl border border-border bg-card p-7 text-left shadow-sm transition hover:-translate-y-1 hover:border-brand-green hover:shadow-md"
               >
                 <span className="grid size-14 place-items-center rounded-xl bg-brand-green/15 text-brand-navy">
@@ -614,7 +618,7 @@ function Index() {
         ) : null}
 
         {mode === "field" ? (
-          <section className="space-y-6">
+          <section className={mode === "field" && !fieldStarted && !activeVisit ? "flex min-h-0 flex-1 flex-col" : "space-y-6"}>
             {!fieldStarted && !activeVisit ? (
               <section className="grid min-h-0 flex-1 place-items-center overflow-hidden py-2">
                 <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-5 shadow-lg sm:p-6">
@@ -646,19 +650,19 @@ function Index() {
                       : "Data e hora automáticas"}
                   </div>
                   <div className="mt-4 grid grid-cols-2 gap-2">
-                    <Button type="button" variant="outline" aria-pressed={isPriority} onClick={() => setIsPriority(true)} className={`h-11 ${isPriority ? "border-amber-500 bg-amber-500/10 text-amber-700" : "bg-background"}`}>
-                      {isPriority ? <CheckCircle2 className="size-4" /> : null}
+                    <Button type="button" variant="outline" aria-pressed={isPriority === true} onClick={() => setIsPriority(true)} className={`h-11 ${isPriority === true ? "border-amber-500 bg-amber-500/10 text-amber-700" : "bg-background"}`}>
+                      {isPriority === true ? <CheckCircle2 className="size-4" /> : null}
                       Prioritária
                     </Button>
-                    <Button type="button" variant="outline" aria-pressed={!isPriority} onClick={() => setIsPriority(false)} className={`h-11 ${!isPriority ? "border-primary bg-primary/10 text-primary" : "bg-background"}`}>
-                      {!isPriority ? <Check className="size-4" /> : null}
+                    <Button type="button" variant="outline" aria-pressed={isPriority === false} onClick={() => setIsPriority(false)} className={`h-11 ${isPriority === false ? "border-primary bg-primary/10 text-primary" : "bg-background"}`}>
+                      {isPriority === false ? <Check className="size-4" /> : null}
                       Não prioritária
                     </Button>
                   </div>
                   <Button
                     type="button"
                     size="lg"
-                    disabled={!selectedStore || startVisitMutation.isPending}
+                    disabled={!selectedStore || isPriority === null || startVisitMutation.isPending}
                     onClick={handleStartVisit}
                     className="mt-7 h-12 w-full bg-brand-green text-brand-green-foreground hover:bg-brand-green/90"
                   >
