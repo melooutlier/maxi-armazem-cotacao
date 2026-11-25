@@ -20,8 +20,8 @@ export type Priority = (typeof PRIORITIES)[number];
 export type StockLevel = "very-low" | "low" | "good";
 
 export function getStockLevel(stock: number): StockLevel {
-  if (stock <= 5) return "very-low";
-  if (stock <= 15) return "low";
+  if (stock < 10) return "very-low";
+  if (stock <= 30) return "low";
   return "good";
 }
 
