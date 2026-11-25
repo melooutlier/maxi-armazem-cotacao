@@ -489,17 +489,17 @@ function Index() {
       .join("") || "MA";
 
   return (
-    <main className={mode === "field" && !fieldStarted && !activeVisit ? "flex h-screen flex-col overflow-hidden bg-background text-foreground" : "min-h-screen bg-background text-foreground"}>
+    <main className={mode === "field" && !fieldStarted && !activeVisit ? "flex h-[100svh] flex-col overflow-hidden bg-background text-foreground" : "min-h-screen bg-background text-foreground"}>
       <header className="no-print shrink-0 border-b border-brand-navy/15 bg-brand-navy text-brand-navy-foreground">
-        <div className="mx-auto flex max-w-[1440px] flex-col gap-4 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
+        <div className={`mx-auto flex max-w-[1440px] flex-col gap-2 px-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8 ${mode === "field" && !fieldStarted && !activeVisit ? "py-2" : "py-4"}`}>
           <div className="flex items-center justify-between gap-5">
             <div className="flex min-w-0 items-center gap-3">
-              <span className="grid size-11 shrink-0 place-items-center rounded-md bg-brand-green text-brand-green-foreground">
+              <span className={`grid shrink-0 place-items-center rounded-md bg-brand-green text-brand-green-foreground ${mode === "field" && !fieldStarted && !activeVisit ? "size-9" : "size-11"}`}>
                 <Boxes className="size-6" aria-hidden="true" />
               </span>
               <div className="min-w-0">
                 <p className="font-display text-lg font-semibold leading-tight">Maxi Armazém</p>
-                <p className="text-xs text-brand-navy-foreground/70">Operação de reposição · Maputo</p>
+                {mode === "field" && !fieldStarted && !activeVisit ? null : <p className="text-xs text-brand-navy-foreground/70">Operação de reposição · Maputo</p>}
               </div>
             </div>
             <div className="flex items-center gap-2 lg:hidden">
@@ -514,7 +514,7 @@ function Index() {
               type="button"
               variant="outline"
               onClick={() => setMode("menu")}
-              className="border-brand-navy-foreground/30 bg-brand-navy-foreground/10 text-brand-navy-foreground hover:bg-brand-navy-foreground/20"
+              className={`border-brand-navy-foreground/30 bg-brand-navy-foreground/10 text-brand-navy-foreground hover:bg-brand-navy-foreground/20 ${mode === "field" && !fieldStarted && !activeVisit ? "h-9" : ""}`}
             >
               <ArrowRight className="rotate-180" aria-hidden="true" />
               Menu inicial
@@ -543,17 +543,17 @@ function Index() {
         </div>
       </header>
 
-      <div className={mode === "field" && !fieldStarted && !activeVisit ? "mx-auto flex min-h-0 w-full max-w-[1440px] flex-1 flex-col overflow-hidden px-4 pb-3 pt-3 sm:px-6 lg:px-8" : "mx-auto max-w-[1440px] px-4 pb-10 pt-6 sm:px-6 lg:px-8 lg:pt-9"}>
-        <div className={`no-print flex flex-col gap-3 border-b border-border pb-3 sm:flex-row sm:items-end sm:justify-between ${mode === "field" && !fieldStarted && !activeVisit ? "mb-3 shrink-0" : "mb-7"}`}>
+      <div className={mode === "field" && !fieldStarted && !activeVisit ? "mx-auto flex min-h-0 w-full max-w-[1440px] flex-1 flex-col overflow-hidden px-3 pb-2 pt-1 sm:px-6 lg:px-8" : "mx-auto max-w-[1440px] px-4 pb-10 pt-6 sm:px-6 lg:px-8 lg:pt-9"}>
+        <div className={`no-print flex flex-col gap-2 border-b border-border pb-2 sm:flex-row sm:items-end sm:justify-between ${mode === "field" && !fieldStarted && !activeVisit ? "mb-1 shrink-0" : "mb-7"}`}>
           <div>
-            <p className="mb-2 inline-flex items-center gap-2 text-xs font-semibold uppercase text-success">
+            <p className={`mb-1 inline-flex items-center gap-2 text-xs font-semibold uppercase text-success ${mode === "field" && !fieldStarted && !activeVisit ? "hidden" : ""}`}>
               <span className="size-2 rounded-full bg-success" />
               Sistema de gestão flexível
             </p>
-            <h1 className="font-display text-3xl font-semibold tracking-normal text-foreground sm:text-4xl">
+            <h1 className={`font-display font-semibold tracking-normal text-foreground ${mode === "field" && !fieldStarted && !activeVisit ? "text-lg" : "text-3xl sm:text-4xl"}`}>
               {mode === "menu" ? "Área de trabalho" : mode === "field" ? "Vistoria em campo" : mode === "office" ? "Lançamento no escritório" : mode === "companies" ? "Cadastro de empresas" : "Histórico & relatórios"}
             </h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
+            <p className={`mt-1 max-w-2xl text-sm leading-5 text-muted-foreground sm:text-base ${mode === "field" && !fieldStarted && !activeVisit ? "hidden" : ""}`}>
               {mode === "menu"
                 ? "Escolha a área em que pretende trabalhar."
                 : mode === "field"
@@ -621,20 +621,20 @@ function Index() {
         {mode === "field" ? (
           <section className={mode === "field" && !fieldStarted && !activeVisit ? "flex min-h-0 flex-1 flex-col" : "space-y-6"}>
             {!fieldStarted && !activeVisit ? (
-              <section className="grid min-h-0 flex-1 place-items-center overflow-hidden py-2">
-                <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-5 shadow-lg sm:p-6">
-                  <div className="mx-auto mb-5 grid size-14 place-items-center rounded-2xl bg-brand-green/15 text-brand-navy">
-                    <Store className="size-7" aria-hidden="true" />
+              <section className="grid min-h-0 flex-1 place-items-center overflow-hidden py-1">
+                <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-3 shadow-lg sm:p-4">
+                  <div className="mx-auto mb-2 grid size-9 place-items-center rounded-xl bg-brand-green/15 text-brand-navy sm:size-10">
+                    <Store className="size-5" aria-hidden="true" />
                   </div>
                   <div className="text-center">
                     <p className="text-xs font-semibold uppercase tracking-wider text-success">Vistoria de campo</p>
                     <h2 className="mt-2 font-display text-2xl font-semibold">Escolher empresa</h2>
-                    <p className="mt-2 text-sm leading-6 text-muted-foreground">Seleccione a empresa onde pretende realizar a vistoria. Depois de iniciar, poderá pesquisar produtos e registar as faltas.</p>
+                    <p className="mt-1 text-xs leading-4 text-muted-foreground">Seleccione a empresa onde pretende realizar a vistoria.</p>
                   </div>
-                  <label className="mt-5 grid gap-2 text-sm font-medium">
+                  <label className="mt-3 grid gap-1 text-sm font-medium">
                     Empresa
                     <Select value={selectedStore} onValueChange={setSelectedStore}>
-                      <SelectTrigger className="h-12 bg-background text-left">
+                      <SelectTrigger className="h-10 bg-background text-left">
                         <SelectValue placeholder="Escolha a empresa" />
                       </SelectTrigger>
                       <SelectContent>
@@ -644,18 +644,18 @@ function Index() {
                       </SelectContent>
                     </Select>
                   </label>
-                  <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                  <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
                     <CalendarDays className="size-4" aria-hidden="true" />
                     {clock
                       ? new Intl.DateTimeFormat("pt-MZ", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(clock)
                       : "Data e hora automáticas"}
                   </div>
-                  <div className="mt-4 grid grid-cols-2 gap-2">
-                    <Button type="button" variant="outline" aria-pressed={isPriority === true} onClick={() => setIsPriority(true)} className={`h-11 ${isPriority === true ? "border-amber-500 bg-amber-500/10 text-amber-700" : "bg-background"}`}>
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    <Button type="button" variant="outline" aria-pressed={isPriority === true} onClick={() => setIsPriority(true)} className={`h-9 ${isPriority === true ? "border-amber-500 bg-amber-500/10 text-amber-700" : "bg-background"}`}>
                       {isPriority === true ? <CheckCircle2 className="size-4" /> : null}
                       Prioritária
                     </Button>
-                    <Button type="button" variant="outline" aria-pressed={isPriority === false} onClick={() => setIsPriority(false)} className={`h-11 ${isPriority === false ? "border-primary bg-primary/10 text-primary" : "bg-background"}`}>
+                    <Button type="button" variant="outline" aria-pressed={isPriority === false} onClick={() => setIsPriority(false)} className={`h-9 ${isPriority === false ? "border-primary bg-primary/10 text-primary" : "bg-background"}`}>
                       {isPriority === false ? <Check className="size-4" /> : null}
                       Não prioritária
                     </Button>
@@ -665,7 +665,7 @@ function Index() {
                     size="lg"
                     disabled={!selectedStore || isPriority === null || startVisitMutation.isPending}
                     onClick={handleStartVisit}
-                    className="mt-7 h-12 w-full bg-brand-green text-brand-green-foreground hover:bg-brand-green/90"
+                    className="mt-3 h-10 w-full bg-brand-green text-brand-green-foreground hover:bg-brand-green/90"
                   >
                     {startVisitMutation.isPending ? "A iniciar vistoria…" : "Iniciar vistoria"}
                     <ArrowRight aria-hidden="true" />
