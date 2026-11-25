@@ -60,15 +60,17 @@ export const PRODUCT_CATALOG: CatalogProduct[] = [
 export const fieldVisitQueryOptions = queryOptions({
   queryKey: ["field-visits"],
   queryFn: async () => {
-    const [visitsResult, itemsResult] = await Promise.all([
+    const [visitsResult, itemsResult, companiesResult] = await Promise.all([
       supabase.from("visits").select("*").order("started_at", { ascending: false }),
       supabase.from("visit_items").select("*").order("created_at", { ascending: true }),
+      supabase.from("companies").select("*").eq("active", true).order("name", { ascending: true }),
     ]);
 
     if (visitsResult.error) throw visitsResult.error;
     if (itemsResult.error) throw itemsResult.error;
+    if (companiesResult.error) throw companiesResult.error;
 
-    return { visits: visitsResult.data, items: itemsResult.data };
+    return { visits: visitsResult.data, items: itemsResult.data, companies: companiesResult.data };
   },
 });
 
