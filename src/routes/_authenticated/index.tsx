@@ -384,7 +384,9 @@ function Index() {
       (!officeDateTo || visitDay <= officeDateTo);
   });
   const officeVisit =
-    officeVisits.find((visit) => visit.id === officeVisitId) ?? officeVisits[0] ?? null;
+    (officeVisitId ? data.visits.find((visit) => visit.id === officeVisitId && visit.status !== "in_progress") : null) ??
+    officeVisits[0] ??
+    null;
   const officeItems = officeVisit
     ? data.items.filter((item) => item.visit_id === officeVisit.id)
     : [];
@@ -1038,12 +1040,7 @@ function Index() {
                         );
                       })}
                     </div>
-                  ) : (
-                    <div className="rounded-lg border border-dashed border-border py-8 text-center">
-                      <History className="mx-auto size-7 text-muted-foreground" aria-hidden="true" />
-                      <p className="mt-2 text-sm font-medium">Ainda não existem vistorias concluídas</p>
-                    </div>
-                  )}
+                  ) : null}
                 </section>
 
             </div>
