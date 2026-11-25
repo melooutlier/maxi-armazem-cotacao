@@ -90,7 +90,6 @@ function Index() {
   const [completionChoiceOpen, setCompletionChoiceOpen] = useState(false);
   const [completionConfirmOpen, setCompletionConfirmOpen] = useState(false);
   const [stockWarningProduct, setStockWarningProduct] = useState<CatalogProduct | null>(null);
-  const [isPriority, setIsPriority] = useState<boolean | null>(null);
   const [selectedStore, setSelectedStore] = useState<string>("VIP Spar Sommerschield");
   const [operatorName, setOperatorName] = useState("Utilizador autenticado");
   const [selectedVisitId, setSelectedVisitId] = useState<string | null>(null);
@@ -230,10 +229,10 @@ function Index() {
   });
 
   const startVisitMutation = useMutation({
-    mutationFn: async ({ supermarket, operator, isPriority: priorityFlag }: { supermarket: string; operator: string; isPriority: boolean }) => {
+    mutationFn: async ({ supermarket, operator }: { supermarket: string; operator: string }) => {
       const { data: visit, error } = await supabase
         .from("visits")
-        .insert({ supermarket, operator_name: operator, status: "in_progress", is_priority: priorityFlag })
+        .insert({ supermarket, operator_name: operator, status: "in_progress", is_priority: false })
         .select()
         .single();
       if (error) throw error;
@@ -401,11 +400,7 @@ function Index() {
       toast.error("Não foi possível identificar o utilizador autenticado.");
       return;
     }
-    if (isPriority === null) {
-      toast.error("Indique se a empresa é prioritária ou não.");
-      return;
-    }
-    startVisitMutation.mutate({ supermarket: selectedStore, operator, isPriority });
+    startVisitMutation.mutate({ supermarket: selectedStore, operator });
   };
 
   const handleAddItem = () => {
@@ -544,7 +539,7 @@ function Index() {
               </span>
               <div className="min-w-0">
                 <p className="font-display text-lg font-semibold leading-tight">Maxi Armazém</p>
-                {mode === "field" && !fieldStarted && !activeVisit ? null : <p className="text-xs text-brand-navy-foreground/70">Operação de reposição · Maputo</p>}
+                {mode === "field" && !fieldStarted && !activeVisit ? null : <p className="text-xs text-brand-navy-foreground/70">Operação de reposição</p>}
               </div>
             </div>
             <div className="flex items-center gap-2 lg:hidden">
@@ -628,7 +623,6 @@ function Index() {
                   setMode(id);
                   if (id === "field") {
                     setFieldStarted(false);
-                    setIsPriority(null);
                   }
                   if (id === "office") {
                     setOfficeEntered(false);
@@ -687,20 +681,10 @@ function Index() {
                       ? new Intl.DateTimeFormat("pt-MZ", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(clock)
                       : "Data e hora automáticas"}
                   </div>
-                  <div className="mt-2 grid grid-cols-2 gap-2">
-                    <Button type="button" variant="outline" aria-pressed={isPriority === true} onClick={() => setIsPriority(true)} className={`h-9 ${isPriority === true ? "border-amber-500 bg-amber-500/10 text-amber-700" : "bg-background"}`}>
-                      {isPriority === true ? <CheckCircle2 className="size-4" /> : null}
-                      Prioritária
-                    </Button>
-                    <Button type="button" variant="outline" aria-pressed={isPriority === false} onClick={() => setIsPriority(false)} className={`h-9 ${isPriority === false ? "border-primary bg-primary/10 text-primary" : "bg-background"}`}>
-                      {isPriority === false ? <Check className="size-4" /> : null}
-                      Não prioritária
-                    </Button>
-                  </div>
                   <Button
                     type="button"
                     size="lg"
-                    disabled={!selectedStore || isPriority === null || startVisitMutation.isPending}
+                    disabled={!selectedStore || startVisitMutation.isPending}
                     onClick={handleStartVisit}
                     className="mt-3 h-10 w-full bg-brand-green text-brand-green-foreground hover:bg-brand-green/90"
                   >
@@ -844,7 +828,6 @@ function Index() {
                   <p className="text-xs font-semibold uppercase text-muted-foreground">03 · Rever faltas</p>
                   <h2 className="mt-1 font-display text-xl font-semibold">Lista da vistoria</h2>
                   <p className="mt-1 text-sm text-muted-foreground">{activeVisit?.supermarket ?? selectedStore}</p>
-                   {activeVisit ? <Badge variant="outline" className={activeVisit.is_priority ? "mt-2 border-amber-500/40 bg-amber-500/10 text-amber-700" : "mt-2"}>{activeVisit.is_priority ? "Empresa prioritária" : "Não prioritária"}</Badge> : null}
                 </div>
                 <Badge variant="secondary" className="tabular-nums">{activeItems.length} {activeItems.length === 1 ? "produto" : "produtos"}</Badge>
               </div>
