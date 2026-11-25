@@ -103,7 +103,8 @@ function Index() {
   const [historyStore, setHistoryStore] = useState("all");
   const [historyStatus, setHistoryStatus] = useState<"all" | "pending" | "completed">("all");
   const [companyName, setCompanyName] = useState("");
-  const [companies, setCompanies] = useState<string[]>([...SUPERMARKETS]);
+  const [officeCompany, setOfficeCompany] = useState("");
+  const [officeEntered, setOfficeEntered] = useState(false);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [searchText, setSearchText] = useState("");
@@ -280,7 +281,8 @@ function Index() {
     ).slice(0, 6);
   }, [searchText, selectedProduct]);
 
-  const officeVisits = data.visits.filter((visit) => visit.status !== "in_progress");
+  const companies = data.companies.map((company) => company.name);
+  const officeVisits = data.visits.filter((visit) => visit.status !== "in_progress" && (!officeEntered || visit.supermarket === officeCompany));
   const officeVisit =
     officeVisits.find((visit) => visit.id === officeVisitId) ?? officeVisits[0] ?? null;
   const officeItems = officeVisit
@@ -464,7 +466,7 @@ function Index() {
               <button
                 key={id}
                 type="button"
-                onClick={() => setMode(id)}
+                onClick={() => { setMode(id); if (id === "office") { setOfficeEntered(false); setOfficeCompany(""); setOfficeVisitId(""); } }}
                 className="group flex min-h-56 flex-col items-start justify-between rounded-xl border border-border bg-card p-7 text-left shadow-sm transition hover:-translate-y-1 hover:border-brand-green hover:shadow-md"
               >
                 <span className="grid size-14 place-items-center rounded-xl bg-brand-green/15 text-brand-navy">
@@ -792,6 +794,19 @@ function Index() {
 
         {mode === "office" ? (
           <section className="space-y-6">
+            {!officeEntered ? (
+              <div className="mx-auto max-w-2xl rounded-md border border-border bg-card p-6 shadow-sm sm:p-8">
+                <div className="mb-5 flex items-center gap-3"><span className="grid size-11 place-items-center rounded-md bg-brand-green/15 text-brand-navy"><Store className="size-5" /></span><div><h2 className="font-display text-xl font-semibold">Escolher empresa</h2><p className="text-sm text-muted-foreground">Seleccione a empresa cujos lançamentos pretende tratar.</p></div></div>
+                <label className="grid gap-2 text-sm font-medium">Empresa
+                  <Select value={officeCompany} onValueChange={setOfficeCompany}>
+                    <SelectTrigger className="h-12 bg-background"><SelectValue placeholder="Seleccione a empresa" /></SelectTrigger>
+                    <SelectContent>{companies.map((company) => <SelectItem key={company} value={company}>{company}</SelectItem>)}</SelectContent>
+                  </Select>
+                </label>
+                <Button type="button" className="mt-5 h-12 w-full" disabled={!officeCompany} onClick={() => { setOfficeEntered(true); const firstVisit = data.visits.find((visit) => visit.supermarket === officeCompany && visit.status !== "in_progress"); setOfficeVisitId(firstVisit?.id ?? ""); }}>Entrar <ArrowRight /></Button>
+              </div>
+            ) : (
+            <>
             <div className="no-print flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-end sm:justify-between">
               <label className="grid w-full max-w-xl gap-2 text-sm font-medium">
                 Empresa / vistoria para lançamento
@@ -897,8 +912,10 @@ function Index() {
               <EmptyState
                 icon={<ClipboardList className="size-6" aria-hidden="true" />}
                 title="Nenhuma vistoria para lançar"
-                description="As vistorias concluídas aparecerão aqui para serem copiadas ou lançadas no sistema central."
+                description={`Ainda não existem vistorias concluídas para ${officeCompany}.`}
               />
+            )}
+            </>
             )}
           </section>
         ) : null}
@@ -910,12 +927,11 @@ function Index() {
                 <span className="grid size-11 place-items-center rounded-md bg-brand-green/15 text-brand-navy"><Store className="size-5" /></span>
                 <div><h2 className="font-display text-xl font-semibold">Cadastro de empresa</h2><p className="text-sm text-muted-foreground">Adicione empresas à lista de locais de vistoria.</p></div>
               </div>
-              <form className="flex flex-col gap-3 sm:flex-row" onSubmit={(event) => { event.preventDefault(); const name = companyName.trim(); if (!name) return; if (companies.some((company) => company.toLocaleLowerCase("pt-MZ") === name.toLocaleLowerCase("pt-MZ"))) { toast.error("Esta empresa já está cadastrada."); return; } setCompanies((current) => [...current, name]); setCompanyName(""); toast.success("Empresa adicionada nesta sessão."); }}>
+              <form className="flex flex-col gap-3 sm:flex-row" onSubmit={async (event) => { event.preventDefault(); const name = companyName.trim(); if (!name) return; const { error } = await supabase.from("companies").insert({ name }); if (error) { toast.error(error.code === "23505" ? "Esta empresa já está cadastrada." : `Não foi possível cadastrar a empresa: ${error.message}`); return; } setCompanyName(""); await refreshVisits(); toast.success("Empresa cadastrada com sucesso."); }}>
                 <Input value={companyName} onChange={(event) => setCompanyName(event.target.value)} placeholder="Nome da empresa" className="h-12" />
                 <Button type="submit" className="h-12 shrink-0"><Plus className="size-4" /> Adicionar empresa</Button>
               </form>
               <div className="mt-6 space-y-2"><h3 className="text-sm font-semibold">Empresas disponíveis</h3>{companies.map((company) => <div key={company} className="rounded-md border border-border px-4 py-3 text-sm">{company}</div>)}</div>
-              <p className="mt-4 text-xs text-muted-foreground">Nota: os novos nomes ficam disponíveis durante esta sessão. A gravação permanente na base de dados será activada com a migração de empresas.</p>
             </div>
           </section>
         ) : null}
@@ -1008,6 +1024,8 @@ function Index() {
                         className="justify-self-start sm:justify-self-end"
                         onClick={() => {
                           setOfficeVisitId(visit.id);
+                          setOfficeCompany(visit.supermarket);
+                          setOfficeEntered(true);
                           setMode("office");
                         }}
                         disabled={visit.status === "in_progress"}
