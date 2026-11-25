@@ -56,7 +56,7 @@ import {
 } from "@/lib/field-visits";
 import { supabase } from "@/integrations/supabase/client";
 
-type ViewMode = "menu" | "field" | "office" | "history";
+type ViewMode = "menu" | "field" | "office" | "history" | "cadastro";
 
 export const Route = createFileRoute("/_authenticated/")({
   loader: ({ context }) => context.queryClient.ensureQueryData(fieldVisitQueryOptions),
@@ -83,6 +83,7 @@ const MODES: { id: ViewMode; label: string; icon: typeof MapPin }[] = [
   { id: "field", label: "Campo", icon: MapPin },
   { id: "office", label: "Escritório", icon: ClipboardList },
   { id: "history", label: "Histórico", icon: History },
+  { id: "cadastro", label: "Cadastro", icon: ClipboardCheck },
 ];
 
 const priorityStyles: Record<Priority, string> = {
@@ -100,6 +101,9 @@ function Index() {
   const [selectedVisitId, setSelectedVisitId] = useState<string | null>(null);
   const [officeVisitId, setOfficeVisitId] = useState("");
   const [historyStore, setHistoryStore] = useState("all");
+  const [historyStatus, setHistoryStatus] = useState<"all" | "pending" | "completed">("all");
+  const [companyName, setCompanyName] = useState("");
+  const [companies, setCompanies] = useState<string[]>([...SUPERMARKETS]);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [searchText, setSearchText] = useState("");
@@ -288,28 +292,12 @@ function Index() {
     const matchesStore = historyStore === "all" || visit.supermarket === historyStore;
     const matchesFrom = dateFrom.length === 0 || visitDay >= dateFrom;
     const matchesTo = dateTo.length === 0 || visitDay <= dateTo;
-    return matchesStore && matchesFrom && matchesTo;
+    const items = data.items.filter((item) => item.visit_id === visit.id);
+    const isPending = visit.status === "in_progress" || (visit.status === "completed" && items.some((item) => !item.launched));
+    const isCompleted = visit.status === "launched" || (visit.status === "completed" && items.length > 0 && items.every((item) => item.launched));
+    const matchesStatus = historyStatus === "all" || (historyStatus === "pending" ? isPending : isCompleted);
+    return matchesStore && matchesFrom && matchesTo && matchesStatus;
   });
-
-  const completedVisits = data.visits.filter(
-    (visit) => visit.status !== "in_progress" && visit.completed_at !== null,
-  );
-  const completedDurations = completedVisits
-    .map((visit) => durationInMinutes(visit.started_at, visit.completed_at))
-    .filter((minutes): minutes is number => minutes !== null);
-  const averageDuration =
-    completedDurations.length > 0
-      ? Math.round(completedDurations.reduce((total, minutes) => total + minutes, 0) / completedDurations.length)
-      : null;
-  const pendingStores = new Set(
-    data.visits
-      .filter(
-        (visit) =>
-          visit.status === "completed" &&
-          data.items.some((item) => item.visit_id === visit.id && !item.launched),
-      )
-      .map((visit) => visit.supermarket),
-  );
 
   const handleStartVisit = () => {
     const operator = operatorName.trim();
@@ -346,6 +334,28 @@ function Index() {
     }
   };
 
+  const handleMarkAllLaunched = async () => {
+    if (!officeVisit || officeItems.length === 0) return;
+    const pendingItems = officeItems.filter((item) => !item.launched);
+    if (pendingItems.length === 0) {
+      toast.info("Todos os produtos já estão marcados como lançados.");
+      return;
+    }
+    const { error } = await supabase.from("visit_items").update({ launched: true }).eq("visit_id", officeVisit.id).eq("launched", false);
+    if (error) {
+      toast.error(`Não foi possível concluir os lançamentos: ${error.message}`);
+      return;
+    }
+    const { error: visitError } = await supabase.from("visits").update({ status: "launched" }).eq("id", officeVisit.id);
+    if (visitError) {
+      toast.error(`Produtos lançados, mas não foi possível actualizar o estado da vistoria: ${visitError.message}`);
+      await refreshVisits();
+      return;
+    }
+    await refreshVisits();
+    toast.success(`${pendingItems.length} produto(s) marcado(s) como lançado(s).`);
+  };
+
   const handleCopyAll = () => {
     if (!officeVisit) return;
     const lines = [
@@ -355,45 +365,6 @@ function Index() {
       ),
     ];
     void handleCopy(lines.join("\n"), "Lista copiada para o lançamento.");
-  };
-
-  const handleExportCsv = () => {
-    if (!officeVisit) return;
-    const quote = (value: string | number | boolean) => `"${String(value).replaceAll('"', '""')}"`;
-    const lines = [
-      [
-        "Código da vistoria",
-        "Supermercado",
-        "Código do produto",
-        "Produto",
-        "Quantidade em falta",
-        "Unidade",
-        "Prioridade",
-        "Lançado no ERP",
-      ].map(quote),
-      ...officeItems.map((item) =>
-        [
-          officeVisit.visit_code ?? "",
-          officeVisit.supermarket,
-          item.product_code,
-          item.product_name,
-          item.quantity,
-          item.unit,
-          item.priority,
-          item.launched ? "Sim" : "Não",
-        ].map(quote),
-      ),
-    ];
-    const csv = `\uFEFF${lines.map((line) => line.join(";")).join("\r\n")}`;
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${officeVisit.visit_code ?? "vistoria"}.csv`;
-    document.body.append(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-    toast.success("Ficheiro CSV exportado.");
   };
 
   const initials =
@@ -488,7 +459,7 @@ function Index() {
         </div>
 
         {mode === "menu" ? (
-          <section className="mx-auto grid max-w-5xl gap-5 py-8 md:grid-cols-3">
+          <section className="mx-auto grid max-w-5xl gap-5 py-8 md:grid-cols-2 xl:grid-cols-4">
             {MODES.map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
@@ -502,7 +473,7 @@ function Index() {
                 <span>
                   <span className="block font-display text-2xl font-semibold">{label}</span>
                   <span className="mt-2 block text-sm text-muted-foreground">
-                    {id === "field" ? "Iniciar e registar uma vistoria nas lojas." : id === "office" ? "Consultar listas e preparar lançamentos." : "Consultar vistorias e indicadores anteriores."}
+                    {id === "field" ? "Iniciar e registar uma vistoria nas lojas." : id === "office" ? "Consultar listas e preparar lançamentos." : id === "history" ? "Consultar vistorias e relatórios anteriores." : "Registar e gerir empresas."}
                   </span>
                 </span>
                 <span className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-brand-navy">
@@ -534,7 +505,7 @@ function Index() {
                       <SelectValue placeholder="Escolha a loja" />
                     </SelectTrigger>
                     <SelectContent>
-                      {SUPERMARKETS.map((store) => (
+                      {companies.map((store) => (
                         <SelectItem key={store} value={store}>
                           {store}
                         </SelectItem>
@@ -823,7 +794,7 @@ function Index() {
           <section className="space-y-6">
             <div className="no-print flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-end sm:justify-between">
               <label className="grid w-full max-w-xl gap-2 text-sm font-medium">
-                Vistoria para lançamento
+                Empresa / vistoria para lançamento
                 <Select value={officeVisit?.id ?? "none"} onValueChange={setOfficeVisitId}>
                   <SelectTrigger className="h-12 bg-card">
                     <SelectValue placeholder="Selecione uma vistoria" />
@@ -843,11 +814,8 @@ function Index() {
                   <Button type="button" variant="outline" onClick={handleCopyAll} className="h-11">
                     <Copy aria-hidden="true" /> Copiar todos
                   </Button>
-                  <Button type="button" variant="outline" onClick={handleExportCsv} className="h-11">
-                    <Download aria-hidden="true" /> Exportar CSV
-                  </Button>
-                  <Button type="button" onClick={() => window.print()} className="h-11">
-                    <Printer aria-hidden="true" /> Imprimir guia
+                  <Button type="button" onClick={handleMarkAllLaunched} disabled={launchItemMutation.isPending || officeItems.every((item) => item.launched)} className="h-11">
+                    <CheckCircle2 aria-hidden="true" /> Marcar todos como lançados
                   </Button>
                 </div>
               ) : null}
@@ -935,29 +903,25 @@ function Index() {
           </section>
         ) : null}
 
+        {mode === "cadastro" ? (
+          <section className="mx-auto max-w-3xl space-y-6">
+            <div className="rounded-md border border-border bg-card p-5 shadow-sm sm:p-7">
+              <div className="mb-5 flex items-center gap-3">
+                <span className="grid size-11 place-items-center rounded-md bg-brand-green/15 text-brand-navy"><Store className="size-5" /></span>
+                <div><h2 className="font-display text-xl font-semibold">Cadastro de empresa</h2><p className="text-sm text-muted-foreground">Adicione empresas à lista de locais de vistoria.</p></div>
+              </div>
+              <form className="flex flex-col gap-3 sm:flex-row" onSubmit={(event) => { event.preventDefault(); const name = companyName.trim(); if (!name) return; if (companies.some((company) => company.toLocaleLowerCase("pt-MZ") === name.toLocaleLowerCase("pt-MZ"))) { toast.error("Esta empresa já está cadastrada."); return; } setCompanies((current) => [...current, name]); setCompanyName(""); toast.success("Empresa adicionada nesta sessão."); }}>
+                <Input value={companyName} onChange={(event) => setCompanyName(event.target.value)} placeholder="Nome da empresa" className="h-12" />
+                <Button type="submit" className="h-12 shrink-0"><Plus className="size-4" /> Adicionar empresa</Button>
+              </form>
+              <div className="mt-6 space-y-2"><h3 className="text-sm font-semibold">Empresas disponíveis</h3>{companies.map((company) => <div key={company} className="rounded-md border border-border px-4 py-3 text-sm">{company}</div>)}</div>
+              <p className="mt-4 text-xs text-muted-foreground">Nota: os novos nomes ficam disponíveis durante esta sessão. A gravação permanente na base de dados será activada com a migração de empresas.</p>
+            </div>
+          </section>
+        ) : null}
+
         {mode === "history" ? (
           <section className="space-y-7">
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              <Metric
-                icon={<Clock3 className="size-5" aria-hidden="true" />}
-                label="Tempo médio de vistoria"
-                value={formatDuration(averageDuration)}
-                note={`${completedVisits.length} ${completedVisits.length === 1 ? "vistoria concluída" : "vistorias concluídas"}`}
-              />
-              <Metric
-                icon={<Store className="size-5" aria-hidden="true" />}
-                label="Lojas com reposição pendente"
-                value={String(pendingStores.size)}
-                note="Lojas com itens por lançar"
-              />
-              <Metric
-                icon={<Activity className="size-5" aria-hidden="true" />}
-                label="Economia estimada por vistoria"
-                value="≈ 20 min"
-                note="Estimativa provisória · por visita concluída"
-              />
-            </div>
-
             <div className="border-y border-border py-5">
               <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                 <div>
@@ -966,7 +930,7 @@ function Index() {
                 </div>
                 <span className="text-sm text-muted-foreground">{historyVisits.length} registos</span>
               </div>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
                 <label className="grid gap-2 text-xs font-semibold uppercase text-muted-foreground">
                   Supermercado
                   <Select value={historyStore} onValueChange={setHistoryStore}>
@@ -975,7 +939,7 @@ function Index() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todos os supermercados</SelectItem>
-                      {SUPERMARKETS.map((store) => <SelectItem key={store} value={store}>{store}</SelectItem>)}
+                      {companies.map((store) => <SelectItem key={store} value={store}>{store}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </label>
@@ -987,6 +951,17 @@ function Index() {
                   Até
                   <Input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} className="h-11 bg-card text-sm font-normal normal-case text-foreground" />
                 </label>
+                <label className="grid gap-2 text-xs font-semibold uppercase text-muted-foreground">
+                  Estado da vistoria
+                  <Select value={historyStatus} onValueChange={(value) => setHistoryStatus(value as "all" | "pending" | "completed")}>
+                    <SelectTrigger className="h-11 bg-card text-sm font-normal normal-case text-foreground"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas</SelectItem>
+                      <SelectItem value="pending">Pendente</SelectItem>
+                      <SelectItem value="completed">Concluído</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </label>
                 <div className="flex items-end">
                   <Button
                     type="button"
@@ -994,6 +969,7 @@ function Index() {
                     className="h-11 w-full"
                     onClick={() => {
                       setHistoryStore("all");
+                      setHistoryStatus("all");
                       setDateFrom("");
                       setDateTo("");
                     }}
@@ -1008,7 +984,7 @@ function Index() {
                   const items = data.items.filter((item) => item.visit_id === visit.id);
                   const pendingCount = items.filter((item) => !item.launched).length;
                   return (
-                    <article key={visit.id} className="grid gap-3 py-4 sm:grid-cols-[minmax(0,1.3fr)_minmax(140px,0.7fr)_minmax(120px,0.6fr)_auto] sm:items-center">
+                    <article key={visit.id} className="grid gap-3 py-4 sm:grid-cols-[minmax(0,1.3fr)_minmax(140px,0.7fr)_auto] sm:items-center">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
                           <h3 className="font-semibold">{visit.supermarket}</h3>
@@ -1021,8 +997,10 @@ function Index() {
                         {formatDateTime(visit.started_at)}
                       </div>
                       <div className="text-sm text-muted-foreground">
-                        <span className="font-medium text-foreground">{formatDuration(durationInMinutes(visit.started_at, visit.completed_at))}</span>
-                        {pendingCount > 0 ? <span className="ml-2 text-warning-foreground">· {pendingCount} pendentes</span> : null}
+                        <Badge className={pendingCount > 0 || visit.status === "in_progress" ? "border-warning/20 bg-warning/10 text-warning-foreground" : "border-success/20 bg-success/10 text-success"}>
+                          {pendingCount > 0 || visit.status === "in_progress" ? "Pendente" : "Concluído"}
+                        </Badge>
+                        {pendingCount > 0 ? <span className="ml-2">{pendingCount} por lançar</span> : null}
                       </div>
                       <Button
                         type="button"
