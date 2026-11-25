@@ -998,7 +998,6 @@ function Index() {
                     <h2 className="mt-1 font-display text-2xl font-semibold">{officeVisit.supermarket}</h2>
                     <p className="mt-1 text-sm text-muted-foreground">{officeVisit.visit_code} · {formatDateTime(officeVisit.started_at)} · {officeVisit.operator_name}</p>
                     <p className="mt-1 text-sm font-semibold text-success">Desconto geral da empresa: {officeVisit.discount_percent}%</p>
-                    <p className="mt-1 text-sm font-semibold">{officeVisit.is_priority ? "Empresa prioritária" : "Não prioritária"}</p>
                   </div>
                   <Badge className={officeVisit.status === "launched" ? "border-success/20 bg-success/10 text-success" : "border-warning/20 bg-warning/10 text-warning-foreground"}>
                     {officeVisit.status === "launched" ? "Lançamento concluído" : "Lançamento pendente"}
@@ -1247,10 +1246,6 @@ function Index() {
         </div>
       ) : null}
 
-      {mode === "field" && !fieldStarted && !activeVisit ? null : <footer className="no-print mt-10 flex flex-col gap-2 border-t border-border pt-4 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-          <span className="inline-flex items-center gap-2"><MapPin className="size-3.5" aria-hidden="true" /> Operação Maxi Armazém · Maputo, Moçambique</span>
-          <span>Catálogo de demonstração · {PRODUCT_CATALOG.length} produtos</span>
-        </footer>}
       </div>
 
       {companyToDelete ? (
