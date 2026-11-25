@@ -57,7 +57,7 @@ import {
 } from "@/lib/field-visits";
 import { supabase } from "@/integrations/supabase/client";
 
-type ViewMode = "field" | "office" | "history";
+type ViewMode = "menu" | "field" | "office" | "history";
 
 export const Route = createFileRoute("/_authenticated/")({
   loader: ({ context }) => context.queryClient.ensureQueryData(fieldVisitQueryOptions),
@@ -95,7 +95,7 @@ const priorityStyles: Record<Priority, string> = {
 function Index() {
   const queryClient = useQueryClient();
   const { data } = useSuspenseQuery(fieldVisitQueryOptions);
-  const [mode, setMode] = useState<ViewMode>("field");
+  const [mode, setMode] = useState<ViewMode>("menu");
   const [selectedStore, setSelectedStore] = useState<string>("VIP Spar Sommerschield");
   const [operatorName, setOperatorName] = useState("");
   const [selectedVisitId, setSelectedVisitId] = useState<string | null>(null);
@@ -219,7 +219,7 @@ function Index() {
       setSelectedVisitId(null);
       setOfficeVisitId(visit.id);
       await refreshVisits();
-      setMode("office");
+      setMode("menu");
       toast.success(`Vistoria ${visit.visit_code ?? "concluída"} concluída.`);
     },
     onError: (error) => toast.error(`Não foi possível concluir a vistoria: ${error.message}`),
@@ -294,19 +294,6 @@ function Index() {
       )
       .map((visit) => visit.supermarket),
   );
-  const lastWeek = Date.now() - 7 * 24 * 60 * 60 * 1000;
-  const visitById = new Map(data.visits.map((visit) => [visit.id, visit]));
-  const weeklyDemand = new Map<string, { name: string; quantity: number }>();
-  for (const item of data.items) {
-    const visit = visitById.get(item.visit_id);
-    if (!visit || Date.parse(visit.started_at) < lastWeek) continue;
-    const current = weeklyDemand.get(item.product_code);
-    weeklyDemand.set(item.product_code, {
-      name: item.product_name,
-      quantity: (current?.quantity ?? 0) + item.quantity,
-    });
-  }
-  const topRequested = [...weeklyDemand.values()].sort((a, b) => b.quantity - a.quantity)[0] ?? null;
 
   const handleStartVisit = () => {
     const operator = operatorName.trim();
@@ -422,7 +409,7 @@ function Index() {
             </div>
           </div>
 
-          <nav aria-label="Modos de trabalho" className="flex w-full gap-1 overflow-x-auto rounded-md bg-brand-navy-foreground/10 p-1 lg:w-auto">
+          {mode !== "menu" ? <nav aria-label="Modos de trabalho" className="flex w-full gap-1 overflow-x-auto rounded-md bg-brand-navy-foreground/10 p-1 lg:w-auto">
             {MODES.map(({ id, label, icon: Icon }) => (
               <Button
                 key={id}
@@ -440,7 +427,7 @@ function Index() {
                 {label}
               </Button>
             ))}
-          </nav>
+          </nav> : null}
 
           <div className="hidden items-center gap-3 lg:flex">
             <div className="text-right">
@@ -472,14 +459,16 @@ function Index() {
               Sistema de gestão flexível
             </p>
             <h1 className="font-display text-3xl font-semibold tracking-normal text-foreground sm:text-4xl">
-              {mode === "field" ? "Vistoria em campo" : mode === "office" ? "Lançamento no escritório" : "Histórico & relatórios"}
+              {mode === "menu" ? "Área de trabalho" : mode === "field" ? "Vistoria em campo" : mode === "office" ? "Lançamento no escritório" : "Histórico & relatórios"}
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
-              {mode === "field"
-                ? "Registe as faltas da loja com rapidez e siga para a próxima secção."
-                : mode === "office"
-                  ? "Transfira os pedidos para o sistema central e acompanhe cada lançamento."
-                  : "Acompanhe o ritmo das vistorias e as reposições pendentes."}
+              {mode === "menu"
+                ? "Escolha a área em que pretende trabalhar."
+                : mode === "field"
+                  ? "Registe as faltas da loja com rapidez e siga para a próxima secção."
+                  : mode === "office"
+                    ? "Transfira os pedidos para o sistema central e acompanhe cada lançamento."
+                    : "Acompanhe o ritmo das vistorias e as reposições pendentes."}
             </p>
           </div>
           {mode === "field" && activeVisit ? (
@@ -489,6 +478,32 @@ function Index() {
             </Badge>
           ) : null}
         </div>
+
+        {mode === "menu" ? (
+          <section className="mx-auto grid max-w-5xl gap-5 py-8 md:grid-cols-3">
+            {MODES.map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setMode(id)}
+                className="group flex min-h-56 flex-col items-start justify-between rounded-xl border border-border bg-card p-7 text-left shadow-sm transition hover:-translate-y-1 hover:border-brand-green hover:shadow-md"
+              >
+                <span className="grid size-14 place-items-center rounded-xl bg-brand-green/15 text-brand-navy">
+                  <Icon className="size-7" aria-hidden="true" />
+                </span>
+                <span>
+                  <span className="block font-display text-2xl font-semibold">{label}</span>
+                  <span className="mt-2 block text-sm text-muted-foreground">
+                    {id === "field" ? "Iniciar e registar uma vistoria nas lojas." : id === "office" ? "Consultar listas e preparar lançamentos." : "Consultar vistorias e indicadores anteriores."}
+                  </span>
+                </span>
+                <span className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-brand-navy">
+                  Aceder <ArrowRight className="size-4" aria-hidden="true" />
+                </span>
+              </button>
+            ))}
+          </section>
+        ) : null}
 
         {mode === "field" ? (
           <section className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.08fr)_minmax(400px,0.92fr)] xl:gap-8">
@@ -792,7 +807,11 @@ function Index() {
                 <Button
                   type="button"
                   disabled={!activeVisit || !canCompleteVisit(activeItems.length) || completeVisitMutation.isPending}
-                  onClick={() => activeVisit && completeVisitMutation.mutate(activeVisit.id)}
+                  onClick={() => {
+                    if (!activeVisit) return;
+                    const confirmed = window.confirm("Tem a certeza de que pretende concluir esta vistoria? Depois de confirmar, voltará ao menu principal.");
+                    if (confirmed) completeVisitMutation.mutate(activeVisit.id);
+                  }}
                   className="h-12 w-full bg-brand-navy text-brand-navy-foreground hover:bg-brand-navy/90"
                 >
                   <CheckCircle2 aria-hidden="true" />
@@ -921,18 +940,12 @@ function Index() {
 
         {mode === "history" ? (
           <section className="space-y-7">
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               <Metric
                 icon={<Clock3 className="size-5" aria-hidden="true" />}
                 label="Tempo médio de vistoria"
                 value={formatDuration(averageDuration)}
                 note={`${completedVisits.length} ${completedVisits.length === 1 ? "vistoria concluída" : "vistorias concluídas"}`}
-              />
-              <Metric
-                icon={<TrendingUp className="size-5" aria-hidden="true" />}
-                label="Mais solicitado esta semana"
-                value={topRequested?.name ?? "—"}
-                note={topRequested ? `${topRequested.quantity} unidades registadas` : "Sem pedidos nos últimos 7 dias"}
               />
               <Metric
                 icon={<Store className="size-5" aria-hidden="true" />}
