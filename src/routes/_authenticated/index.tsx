@@ -11,15 +11,12 @@ import {
   CheckCircle2,
   ClipboardCheck,
   ClipboardList,
-  Clock3,
   Copy,
-  Download,
   History,
   MapPin,
   Minus,
   Package,
   Plus,
-  Printer,
   Search,
   Store,
   Trash2,
@@ -43,7 +40,6 @@ import {
   QUANTITY_PRESETS,
   addQuantity,
   canCompleteVisit,
-  durationInMinutes,
   fieldVisitQueryOptions,
   formatDateTime,
   formatDuration,
@@ -55,6 +51,7 @@ import {
 } from "@/lib/field-visits";
 import { supabase } from "@/integrations/supabase/client";
 
+type ViewMode = "menu" | "field" | "office" | "history" | "cadastro";
 type ViewMode = "menu" | "field" | "office" | "history" | "companies";
 
 export const Route = createFileRoute("/_authenticated/")({
@@ -82,6 +79,7 @@ const MODES: { id: ViewMode; label: string; icon: typeof MapPin }[] = [
   { id: "field", label: "Campo", icon: MapPin },
   { id: "office", label: "Escritório", icon: ClipboardList },
   { id: "history", label: "Histórico", icon: History },
+  { id: "cadastro", label: "Cadastro", icon: ClipboardCheck },
   { id: "companies", label: "Empresas", icon: Building2 },
 ];
 
@@ -99,6 +97,11 @@ function Index() {
   const [selectedVisitId, setSelectedVisitId] = useState<string | null>(null);
   const [officeVisitId, setOfficeVisitId] = useState("");
   const [historyStore, setHistoryStore] = useState("all");
+  const [historyStatus, setHistoryStatus] = useState<"all" | "pending" | "completed">("all");
+  const [companyName, setCompanyName] = useState("");
+  const [cadastroSection, setCadastroSection] = useState(false);
+  const [officeCompany, setOfficeCompany] = useState("");
+  const [officeEntered, setOfficeEntered] = useState(false);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [searchText, setSearchText] = useState("");
@@ -337,7 +340,8 @@ function Index() {
     ).slice(0, 6);
   }, [searchText, selectedProduct]);
 
-  const officeVisits = data.visits.filter((visit) => visit.status !== "in_progress");
+  const companies = data.companies.map((company) => company.name);
+  const officeVisits = data.visits.filter((visit) => visit.status !== "in_progress" && (!officeEntered || visit.supermarket === officeCompany));
   const officeVisit =
     officeVisits.find((visit) => visit.id === officeVisitId) ?? officeVisits[0] ?? null;
   const officeItems = officeVisit
@@ -349,28 +353,12 @@ function Index() {
     const matchesStore = historyStore === "all" || visit.supermarket === historyStore;
     const matchesFrom = dateFrom.length === 0 || visitDay >= dateFrom;
     const matchesTo = dateTo.length === 0 || visitDay <= dateTo;
-    return matchesStore && matchesFrom && matchesTo;
+    const items = data.items.filter((item) => item.visit_id === visit.id);
+    const isPending = visit.status === "in_progress" || (visit.status === "completed" && items.some((item) => !item.launched));
+    const isCompleted = visit.status === "launched" || (visit.status === "completed" && items.length > 0 && items.every((item) => item.launched));
+    const matchesStatus = historyStatus === "all" || (historyStatus === "pending" ? isPending : isCompleted);
+    return matchesStore && matchesFrom && matchesTo && matchesStatus;
   });
-
-  const completedVisits = data.visits.filter(
-    (visit) => visit.status !== "in_progress" && visit.completed_at !== null,
-  );
-  const completedDurations = completedVisits
-    .map((visit) => durationInMinutes(visit.started_at, visit.completed_at))
-    .filter((minutes): minutes is number => minutes !== null);
-  const averageDuration =
-    completedDurations.length > 0
-      ? Math.round(completedDurations.reduce((total, minutes) => total + minutes, 0) / completedDurations.length)
-      : null;
-  const pendingStores = new Set(
-    data.visits
-      .filter(
-        (visit) =>
-          visit.status === "completed" &&
-          data.items.some((item) => item.visit_id === visit.id && !item.launched),
-      )
-      .map((visit) => visit.supermarket),
-  );
 
   const handleStartVisit = () => {
     const operator = operatorName.trim();
@@ -426,6 +414,28 @@ function Index() {
     } catch {
       toast.error("Não foi possível copiar. Verifique as permissões do navegador.");
     }
+  };
+
+  const handleMarkAllLaunched = async () => {
+    if (!officeVisit || officeItems.length === 0) return;
+    const pendingItems = officeItems.filter((item) => !item.launched);
+    if (pendingItems.length === 0) {
+      toast.info("Todos os produtos já estão marcados como lançados.");
+      return;
+    }
+    const { error } = await supabase.from("visit_items").update({ launched: true }).eq("visit_id", officeVisit.id).eq("launched", false);
+    if (error) {
+      toast.error(`Não foi possível concluir os lançamentos: ${error.message}`);
+      return;
+    }
+    const { error: visitError } = await supabase.from("visits").update({ status: "launched" }).eq("id", officeVisit.id);
+    if (visitError) {
+      toast.error(`Produtos lançados, mas não foi possível actualizar o estado da vistoria: ${visitError.message}`);
+      await refreshVisits();
+      return;
+    }
+    await refreshVisits();
+    toast.success(`${pendingItems.length} produto(s) marcado(s) como lançado(s).`);
   };
 
   const handleCopyAll = () => {
@@ -550,6 +560,8 @@ function Index() {
               <span className="size-2 rounded-full bg-success" />
               Sistema de gestão flexível
             </p>
+            <h1 className="font-display text-3xl font-semibold tracking-normal text-foreground sm:text-4xl">
+              {mode === "menu" ? "Área de trabalho" : mode === "field" ? "Vistoria em campo" : mode === "office" ? "Lançamento no escritório" : mode === "cadastro" ? "Cadastro" : "Histórico & relatórios"}
             <h1 className={`font-display font-semibold tracking-normal text-foreground ${mode === "field" && !fieldStarted && !activeVisit ? "text-lg" : "text-3xl sm:text-4xl"}`}>
               {mode === "menu" ? "Área de trabalho" : mode === "field" ? "Vistoria em campo" : mode === "office" ? "Lançamento no escritório" : mode === "companies" ? "Cadastro de empresas" : "Histórico & relatórios"}
             </h1>
@@ -560,6 +572,9 @@ function Index() {
                   ? (fieldStarted || activeVisit ? "Pesquise os produtos no catálogo e registe as faltas da empresa." : "Escolha a empresa para iniciar uma nova vistoria.")
                   : mode === "office"
                     ? "Transfira os pedidos para o sistema central e acompanhe cada lançamento."
+                    : mode === "cadastro"
+                      ? "Gira o cadastro das empresas utilizadas nas vistorias."
+                      : "Acompanhe as vistorias realizadas e o estado dos lançamentos."}
                     : mode === "companies"
                       ? "Cadastre as empresas para as quais a Maxi Armazém realiza vistorias e descontos."
                       : "Acompanhe o ritmo das vistorias e as reposições pendentes."}
@@ -574,11 +589,13 @@ function Index() {
         </div>
 
         {mode === "menu" ? (
+          <section className="mx-auto grid max-w-5xl gap-5 py-8 md:grid-cols-2 xl:grid-cols-4">
           <section className="mx-auto grid max-w-6xl gap-5 py-8 sm:grid-cols-2 xl:grid-cols-4">
             {MODES.map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
                 type="button"
+                onClick={() => { setMode(id); if (id === "office") { setOfficeEntered(false); setOfficeCompany(""); setOfficeVisitId(""); } if (id === "cadastro") setCadastroSection(false); }}
                 onClick={() => { setMode(id); if (id === "field") { setFieldStarted(false); setIsPriority(null); } }}
                 className="group flex min-h-56 flex-col items-start justify-between rounded-xl border border-border bg-card p-7 text-left shadow-sm transition hover:-translate-y-1 hover:border-brand-green hover:shadow-md"
               >
@@ -588,6 +605,7 @@ function Index() {
                 <span>
                   <span className="block font-display text-2xl font-semibold">{label}</span>
                   <span className="mt-2 block text-sm text-muted-foreground">
+                    {id === "field" ? "Iniciar e registar uma vistoria nas lojas." : id === "office" ? "Consultar listas e preparar lançamentos." : id === "history" ? "Consultar vistorias e relatórios anteriores." : "Registar e gerir empresas."}
                     {id === "field" ? "Iniciar e registar uma vistoria nas lojas." : id === "office" ? "Consultar listas e preparar lançamentos." : id === "history" ? "Consultar vistorias e indicadores anteriores." : "Cadastrar e gerir as empresas onde são feitas as vistorias."}
                   </span>
                 </span>
@@ -618,6 +636,36 @@ function Index() {
           </section>
         ) : null}
 
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="grid gap-2 text-sm font-medium">
+                  Empresa
+                  <Select value={selectedStore} onValueChange={setSelectedStore} disabled={Boolean(activeVisit)}>
+                    <SelectTrigger className="h-12 bg-background text-left">
+                      <SelectValue placeholder="Escolha a loja" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {companies.map((store) => (
+                        <SelectItem key={store} value={store}>
+                          {store}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </label>
+               </div>
+
+              <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <CalendarDays className="size-4" aria-hidden="true" />
+                  {clock
+                    ? new Intl.DateTimeFormat("pt-MZ", {
+                        day: "2-digit",
+                        month: "long",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      }).format(clock)
+                    : "Data e hora automáticas"}
         {mode === "field" ? (
           <section className={mode === "field" && !fieldStarted && !activeVisit ? "flex min-h-0 flex-1 flex-col" : "space-y-6"}>
             {!fieldStarted && !activeVisit ? (
@@ -928,6 +976,19 @@ function Index() {
 
         {mode === "office" ? (
           <section className="space-y-6">
+            {!officeEntered ? (
+              <div className="mx-auto max-w-2xl rounded-md border border-border bg-card p-6 shadow-sm sm:p-8">
+                <div className="mb-5 flex items-center gap-3"><span className="grid size-11 place-items-center rounded-md bg-brand-green/15 text-brand-navy"><Store className="size-5" /></span><div><h2 className="font-display text-xl font-semibold">Escolher empresa</h2><p className="text-sm text-muted-foreground">Seleccione a empresa cujos lançamentos pretende tratar.</p></div></div>
+                <label className="grid gap-2 text-sm font-medium">Empresa
+                  <Select value={officeCompany} onValueChange={setOfficeCompany}>
+                    <SelectTrigger className="h-12 bg-background"><SelectValue placeholder="Seleccione a empresa" /></SelectTrigger>
+                    <SelectContent>{companies.map((company) => <SelectItem key={company} value={company}>{company}</SelectItem>)}</SelectContent>
+                  </Select>
+                </label>
+                <Button type="button" className="mt-5 h-12 w-full" disabled={!officeCompany} onClick={() => { setOfficeEntered(true); const firstVisit = data.visits.find((visit) => visit.supermarket === officeCompany && visit.status !== "in_progress"); setOfficeVisitId(firstVisit?.id ?? ""); }}>Entrar <ArrowRight /></Button>
+              </div>
+            ) : (
+            <>
             <div className="no-print flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-end sm:justify-between">
               <label className="grid w-full max-w-xl gap-2 text-sm font-medium">
                 Vistoria para lançamento
@@ -950,11 +1011,8 @@ function Index() {
                   <Button type="button" variant="outline" onClick={handleCopyAll} className="h-11">
                     <Copy aria-hidden="true" /> Copiar todos
                   </Button>
-                  <Button type="button" variant="outline" onClick={handleExportCsv} className="h-11">
-                    <Download aria-hidden="true" /> Exportar CSV
-                  </Button>
-                  <Button type="button" onClick={() => window.print()} className="h-11">
-                    <Printer aria-hidden="true" /> Imprimir guia
+                  <Button type="button" onClick={handleMarkAllLaunched} disabled={launchItemMutation.isPending || officeItems.every((item) => item.launched)} className="h-11">
+                    <CheckCircle2 aria-hidden="true" /> Marcar todos como lançados
                   </Button>
                 </div>
               ) : null}
@@ -1034,35 +1092,40 @@ function Index() {
               <EmptyState
                 icon={<ClipboardList className="size-6" aria-hidden="true" />}
                 title="Nenhuma vistoria para lançar"
-                description="As vistorias concluídas aparecerão aqui para serem copiadas ou lançadas no sistema central."
+                description={`Ainda não existem vistorias concluídas para ${officeCompany}.`}
               />
+            )}
+            </>
+            )}
+          </section>
+        ) : null}
+
+        {mode === "cadastro" ? (
+          <section className="mx-auto max-w-5xl space-y-6">
+            {!cadastroSection ? (
+              <button type="button" onClick={() => setCadastroSection(true)} className="group flex min-h-52 w-full max-w-sm flex-col items-start justify-between rounded-xl border border-border bg-card p-7 text-left shadow-sm transition hover:-translate-y-1 hover:border-brand-green hover:shadow-md">
+                <span className="grid size-14 place-items-center rounded-xl bg-brand-green/15 text-brand-navy"><Store className="size-7" /></span>
+                <span><span className="block font-display text-2xl font-semibold">Cadastro de empresa</span><span className="mt-2 block text-sm text-muted-foreground">Adicionar uma empresa à lista de vistorias.</span></span>
+                <span className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-brand-navy">Aceder <ArrowRight className="size-4" /></span>
+              </button>
+            ) : (
+            <div className="rounded-md border border-border bg-card p-5 shadow-sm sm:p-7">
+              <div className="mb-5 flex items-center gap-3">
+                <span className="grid size-11 place-items-center rounded-md bg-brand-green/15 text-brand-navy"><Store className="size-5" /></span>
+                <div><h2 className="font-display text-xl font-semibold">Cadastro de empresa</h2><p className="text-sm text-muted-foreground">Adicione empresas à lista de locais de vistoria.</p></div>
+              </div>
+              <form className="flex flex-col gap-3 sm:flex-row" onSubmit={async (event) => { event.preventDefault(); const name = companyName.trim(); if (!name) return; const { error } = await supabase.from("companies").insert({ name }); if (error) { toast.error(error.code === "23505" ? "Esta empresa já está cadastrada." : `Não foi possível cadastrar a empresa: ${error.message}`); return; } setCompanyName(""); await refreshVisits(); toast.success("Empresa cadastrada com sucesso."); }}>
+                <Input value={companyName} onChange={(event) => setCompanyName(event.target.value)} placeholder="Nome da empresa" className="h-12" />
+                <Button type="submit" className="h-12 shrink-0"><Plus className="size-4" /> Adicionar empresa</Button>
+              </form>
+              <div className="mt-6 space-y-2"><h3 className="text-sm font-semibold">Empresas disponíveis</h3>{companies.map((company) => <div key={company} className="rounded-md border border-border px-4 py-3 text-sm">{company}</div>)}</div>
+            </div>
             )}
           </section>
         ) : null}
 
         {mode === "history" ? (
           <section className="space-y-7">
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              <Metric
-                icon={<Clock3 className="size-5" aria-hidden="true" />}
-                label="Tempo médio de vistoria"
-                value={formatDuration(averageDuration)}
-                note={`${completedVisits.length} ${completedVisits.length === 1 ? "vistoria concluída" : "vistorias concluídas"}`}
-              />
-              <Metric
-                icon={<Store className="size-5" aria-hidden="true" />}
-                label="Lojas com reposição pendente"
-                value={String(pendingStores.size)}
-                note="Lojas com itens por lançar"
-              />
-              <Metric
-                icon={<Activity className="size-5" aria-hidden="true" />}
-                label="Economia estimada por vistoria"
-                value="≈ 20 min"
-                note="Estimativa provisória · por visita concluída"
-              />
-            </div>
-
             <div className="border-y border-border py-5">
               <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                 <div>
@@ -1071,15 +1134,16 @@ function Index() {
                 </div>
                 <span className="text-sm text-muted-foreground">{historyVisits.length} registos</span>
               </div>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
                 <label className="grid gap-2 text-xs font-semibold uppercase text-muted-foreground">
-                  Supermercado
+                  Empresa
                   <Select value={historyStore} onValueChange={setHistoryStore}>
                     <SelectTrigger className="h-11 bg-card text-sm font-normal normal-case text-foreground">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todos os supermercados</SelectItem>
+                      {companies.map((store) => <SelectItem key={store} value={store}>{store}</SelectItem>)}
                       {data.companies.map((company) => <SelectItem key={company.id} value={company.name}>{company.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
@@ -1092,6 +1156,17 @@ function Index() {
                   Até
                   <Input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} className="h-11 bg-card text-sm font-normal normal-case text-foreground" />
                 </label>
+                <label className="grid gap-2 text-xs font-semibold uppercase text-muted-foreground">
+                  Estado da vistoria
+                  <Select value={historyStatus} onValueChange={(value) => setHistoryStatus(value as "all" | "pending" | "completed")}>
+                    <SelectTrigger className="h-11 bg-card text-sm font-normal normal-case text-foreground"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas</SelectItem>
+                      <SelectItem value="pending">Pendente</SelectItem>
+                      <SelectItem value="completed">Concluído</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </label>
                 <div className="flex items-end">
                   <Button
                     type="button"
@@ -1099,6 +1174,7 @@ function Index() {
                     className="h-11 w-full"
                     onClick={() => {
                       setHistoryStore("all");
+                      setHistoryStatus("all");
                       setDateFrom("");
                       setDateTo("");
                     }}
@@ -1113,7 +1189,7 @@ function Index() {
                   const items = data.items.filter((item) => item.visit_id === visit.id);
                   const pendingCount = items.filter((item) => !item.launched).length;
                   return (
-                    <article key={visit.id} className="grid gap-3 py-4 sm:grid-cols-[minmax(0,1.3fr)_minmax(140px,0.7fr)_minmax(120px,0.6fr)_auto] sm:items-center">
+                    <article key={visit.id} className="grid gap-3 py-4 sm:grid-cols-[minmax(0,1.3fr)_minmax(140px,0.7fr)_auto] sm:items-center">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
                           <h3 className="font-semibold">{visit.supermarket}</h3>
@@ -1126,8 +1202,10 @@ function Index() {
                         {formatDateTime(visit.started_at)}
                       </div>
                       <div className="text-sm text-muted-foreground">
-                        <span className="font-medium text-foreground">{formatDuration(durationInMinutes(visit.started_at, visit.completed_at))}</span>
-                        {pendingCount > 0 ? <span className="ml-2 text-warning-foreground">· {pendingCount} pendentes</span> : null}
+                        <Badge className={pendingCount > 0 || visit.status === "in_progress" ? "border-warning/20 bg-warning/10 text-warning-foreground" : "border-success/20 bg-success/10 text-success"}>
+                          {pendingCount > 0 || visit.status === "in_progress" ? "Pendente" : "Concluído"}
+                        </Badge>
+                        {pendingCount > 0 ? <span className="ml-2">{pendingCount} por lançar</span> : null}
                       </div>
                       <Button
                         type="button"
@@ -1135,6 +1213,8 @@ function Index() {
                         className="justify-self-start sm:justify-self-end"
                         onClick={() => {
                           setOfficeVisitId(visit.id);
+                          setOfficeCompany(visit.supermarket);
+                          setOfficeEntered(true);
                           setMode("office");
                         }}
                         disabled={visit.status === "in_progress"}
@@ -1210,19 +1290,6 @@ function Index() {
         </div>
       ) : null}
     </main>
-  );
-}
-
-function Metric({ icon, label, value, note }: { icon: React.ReactNode; label: string; value: string; note: string }) {
-  return (
-    <article className="min-w-0 rounded-md border border-border bg-card p-4 shadow-sm sm:p-5">
-      <div className="flex items-center gap-2 text-muted-foreground">
-        <span className="grid size-8 place-items-center rounded-md bg-muted text-brand-navy">{icon}</span>
-        <h3 className="text-xs font-semibold uppercase">{label}</h3>
-      </div>
-      <p className="mt-4 truncate font-display text-2xl font-semibold text-foreground" title={value}>{value}</p>
-      <p className="mt-1 truncate text-xs text-muted-foreground" title={note}>{note}</p>
-    </article>
   );
 }
 

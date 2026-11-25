@@ -19,6 +19,8 @@
     {
       "idx": 2,
       "version": "7",
+      "when": 1795600000000,
+      "tag": "0002_companies",
       "when": 1795598627464,
       "tag": "0002_fix_visit_items_access",
       "breakpoints": true

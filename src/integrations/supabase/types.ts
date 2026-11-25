@@ -53,6 +53,12 @@ export type Database = {
         }
         Relationships: []
       }
+      companies: {
+        Row: { active: boolean; created_at: string; id: string; name: string }
+        Insert: { active?: boolean; created_at?: string; id?: string; name: string }
+        Update: { active?: boolean; created_at?: string; id?: string; name?: string }
+        Relationships: []
+      }
       visit_items: {
         Row: {
           category: string
