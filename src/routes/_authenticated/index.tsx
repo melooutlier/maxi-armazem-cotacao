@@ -378,18 +378,9 @@ function Index() {
 
   const activeCompanies = data.companies.filter((company) => company.active);
   const companies = activeCompanies.map((company) => company.name);
-  const officeVisits = data.visits.filter((visit) => {
-    const visitDay = localDateValue(visit.started_at);
-    const matchesCompany = officeCompanyFilter === "all" || visit.supermarket === officeCompanyFilter;
-    return visit.status !== "in_progress" &&
-      matchesCompany &&
-      (!officeDateFrom || visitDay >= officeDateFrom) &&
-      (!officeDateTo || visitDay <= officeDateTo);
-  });
-  const officeVisit =
-    (officeVisitId ? data.visits.find((visit) => visit.id === officeVisitId && visit.status !== "in_progress") : null) ??
-    officeVisits[0] ??
-    null;
+  const officeVisit = officeVisitId
+    ? data.visits.find((visit) => visit.id === officeVisitId && visit.status !== "in_progress") ?? null
+    : null;
   const officeItems = officeVisit
     ? data.items.filter((item) => item.visit_id === officeVisit.id)
     : [];
@@ -1105,22 +1096,6 @@ function Index() {
                 </div>
                 <Button type="button" variant="outline" onClick={() => { setOfficeEntered(false); setOfficeVisitId(""); }}>Voltar à visão geral</Button>
               </div>
-              <label className="grid w-full max-w-xl gap-2 text-sm font-medium">
-                Vistoria para lançamento
-                <Select value={officeVisit?.id ?? "none"} onValueChange={setOfficeVisitId}>
-                  <SelectTrigger className="h-12 bg-card">
-                    <SelectValue placeholder="Selecione uma vistoria" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Nenhuma vistoria concluída</SelectItem>
-                    {officeVisits.map((visit) => (
-                      <SelectItem key={visit.id} value={visit.id}>
-                        {visit.visit_code ?? "Sem código"} · {visit.supermarket} · {formatDateTime(visit.started_at)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </label>
               {officeVisit ? (
                 <div className="flex flex-wrap gap-2">
                   <Button type="button" variant="outline" onClick={handleCopyAll} className="h-11">
