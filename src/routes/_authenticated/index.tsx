@@ -399,7 +399,8 @@ function Index() {
       toast.error("Informe uma quantidade maior que zero.");
       return;
     }
-    if (quantity > selectedProduct.stock) {
+    const alreadyRequested = activeItems.find((item) => item.product_code === selectedProduct.code)?.quantity ?? 0;
+    if (alreadyRequested + quantity > selectedProduct.stock) {
       setStockWarningProduct(selectedProduct);
       return;
     }
