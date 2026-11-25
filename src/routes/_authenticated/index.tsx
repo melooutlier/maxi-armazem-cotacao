@@ -51,7 +51,7 @@ import {
 } from "@/lib/field-visits";
 import { supabase } from "@/integrations/supabase/client";
 
-type ViewMode = "menu" | "field" | "office" | "history" | "cadastro" | "companies";
+type ViewMode = "menu" | "field" | "office" | "history" | "cadastro";
 
 export const Route = createFileRoute("/_authenticated/")({
   loader: ({ context }) => context.queryClient.ensureQueryData(fieldVisitQueryOptions),
@@ -79,7 +79,6 @@ const MODES: { id: ViewMode; label: string; icon: typeof MapPin }[] = [
   { id: "office", label: "Escritório", icon: ClipboardList },
   { id: "history", label: "Histórico", icon: History },
   { id: "cadastro", label: "Cadastro", icon: ClipboardCheck },
-  { id: "companies", label: "Empresas", icon: Building2 },
 ];
 
 function Index() {
@@ -559,7 +558,7 @@ function Index() {
               Sistema de gestão flexível
             </p>
             <h1 className={`font-display font-semibold tracking-normal text-foreground ${mode === "field" && !fieldStarted && !activeVisit ? "text-lg" : "text-3xl sm:text-4xl"}`}>
-              {mode === "menu" ? "Área de trabalho" : mode === "field" ? "Vistoria em campo" : mode === "office" ? "Lançamento no escritório" : mode === "companies" || mode === "cadastro" ? "Cadastro de empresas" : "Histórico & relatórios"}
+              {mode === "menu" ? "Área de trabalho" : mode === "field" ? "Vistoria em campo" : mode === "office" ? "Lançamento no escritório" : mode === "cadastro" ? "Cadastro" : "Histórico & relatórios"}
             </h1>
             <p className={`mt-1 max-w-2xl text-sm leading-5 text-muted-foreground sm:text-base ${mode === "field" && !fieldStarted && !activeVisit ? "hidden" : ""}`}>
               {mode === "menu"
@@ -568,8 +567,8 @@ function Index() {
                   ? (fieldStarted || activeVisit ? "Pesquise os produtos no catálogo e registe as faltas da empresa." : "Escolha a empresa para iniciar uma nova vistoria.")
                   : mode === "office"
                     ? "Transfira os pedidos para o sistema central e acompanhe cada lançamento."
-                    : mode === "companies" || mode === "cadastro"
-                      ? "Cadastre e gira as empresas utilizadas nas vistorias."
+                    : mode === "cadastro"
+                      ? "Cadastre e consulte as empresas utilizadas nas vistorias."
                       : "Acompanhe o ritmo das vistorias e as reposições pendentes."}
             </p>
           </div>
@@ -598,7 +597,6 @@ function Index() {
                     setOfficeCompany("");
                     setOfficeVisitId("");
                   }
-                  if (id === "cadastro") setCadastroSection(false);
                 }}
                 className="group flex min-h-56 flex-col items-start justify-between rounded-xl border border-border bg-card p-7 text-left shadow-sm transition hover:-translate-y-1 hover:border-brand-green hover:shadow-md"
               >
@@ -616,25 +614,6 @@ function Index() {
                 </span>
               </button>
             ))}
-          </section>
-        ) : null}
-
-        {mode === "companies" ? (
-          <section className="mx-auto max-w-4xl space-y-6">
-            <div className="rounded-xl border border-border bg-card p-5 shadow-sm sm:p-7">
-              <div className="flex items-center gap-3">
-                <span className="grid size-12 place-items-center rounded-xl bg-brand-green/15 text-brand-navy"><Building2 className="size-6" aria-hidden="true" /></span>
-                <div><h2 className="font-display text-xl font-semibold">Cadastrar nova empresa</h2><p className="mt-1 text-sm text-muted-foreground">As empresas cadastradas ficam disponíveis na selecção antes de iniciar uma vistoria.</p></div>
-              </div>
-              <form className="mt-6 flex flex-col gap-3 sm:flex-row" onSubmit={(event) => { event.preventDefault(); const name = companyName.trim(); if (!name) return; createCompanyMutation.mutate(name); }}>
-                <Input value={companyName} onChange={(event) => setCompanyName(event.target.value)} placeholder="Nome da empresa" aria-label="Nome da empresa" className="h-12 bg-background" maxLength={120} />
-                <Button type="submit" disabled={!companyName.trim() || createCompanyMutation.isPending} className="h-12 shrink-0 bg-brand-green text-brand-green-foreground hover:bg-brand-green/90"><Plus aria-hidden="true" />{createCompanyMutation.isPending ? "A cadastrar…" : "Cadastrar empresa"}</Button>
-              </form>
-            </div>
-            <div className="rounded-xl border border-border bg-card p-5 shadow-sm sm:p-7">
-              <div className="flex items-center justify-between gap-3 border-b border-border pb-4"><div><h2 className="font-display text-xl font-semibold">Empresas cadastradas</h2><p className="mt-1 text-sm text-muted-foreground">Empresas disponíveis para novas vistorias.</p></div><Badge variant="secondary">{data.companies.length}</Badge></div>
-              <div className="divide-y divide-border">{data.companies.length ? data.companies.map((company) => <div key={company.id} className="flex items-center gap-3 py-4"><span className="grid size-10 place-items-center rounded-lg bg-muted text-brand-navy"><Store className="size-5" aria-hidden="true" /></span><span className="min-w-0 flex-1 truncate text-sm font-medium">{company.name}</span><Badge variant="outline">Activa</Badge></div>) : <p className="py-8 text-center text-sm text-muted-foreground">Ainda não existem empresas cadastradas.</p>}</div>
-            </div>
           </section>
         ) : null}
 
@@ -1073,26 +1052,42 @@ function Index() {
         ) : null}
 
         {mode === "cadastro" ? (
-          <section className="mx-auto max-w-5xl space-y-6">
-            {!cadastroSection ? (
-              <button type="button" onClick={() => setCadastroSection(true)} className="group flex min-h-52 w-full max-w-sm flex-col items-start justify-between rounded-xl border border-border bg-card p-7 text-left shadow-sm transition hover:-translate-y-1 hover:border-brand-green hover:shadow-md">
-                <span className="grid size-14 place-items-center rounded-xl bg-brand-green/15 text-brand-navy"><Store className="size-7" /></span>
-                <span><span className="block font-display text-2xl font-semibold">Cadastro de empresa</span><span className="mt-2 block text-sm text-muted-foreground">Adicionar uma empresa à lista de vistorias.</span></span>
-                <span className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-brand-navy">Aceder <ArrowRight className="size-4" /></span>
-              </button>
-            ) : (
-            <div className="rounded-md border border-border bg-card p-5 shadow-sm sm:p-7">
-              <div className="mb-5 flex items-center gap-3">
-                <span className="grid size-11 place-items-center rounded-md bg-brand-green/15 text-brand-navy"><Store className="size-5" /></span>
-                <div><h2 className="font-display text-xl font-semibold">Cadastro de empresa</h2><p className="text-sm text-muted-foreground">Adicione empresas à lista de locais de vistoria.</p></div>
+          <section className="mx-auto max-w-4xl space-y-6">
+            <div className="rounded-xl border border-border bg-card p-5 shadow-sm sm:p-7">
+              <div className="flex items-center gap-3">
+                <span className="grid size-12 place-items-center rounded-xl bg-brand-green/15 text-brand-navy">
+                  <Building2 className="size-6" aria-hidden="true" />
+                </span>
+                <div>
+                  <h2 className="font-display text-xl font-semibold">Cadastrar nova empresa</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">As empresas cadastradas ficam disponíveis na selecção antes de iniciar uma vistoria.</p>
+                </div>
               </div>
-              <form className="flex flex-col gap-3 sm:flex-row" onSubmit={async (event) => { event.preventDefault(); const name = companyName.trim(); if (!name) return; const { error } = await supabase.from("companies").insert({ name }); if (error) { toast.error(error.code === "23505" ? "Esta empresa já está cadastrada." : `Não foi possível cadastrar a empresa: ${error.message}`); return; } setCompanyName(""); await refreshVisits(); toast.success("Empresa cadastrada com sucesso."); }}>
-                <Input value={companyName} onChange={(event) => setCompanyName(event.target.value)} placeholder="Nome da empresa" className="h-12" />
-                <Button type="submit" className="h-12 shrink-0"><Plus className="size-4" /> Adicionar empresa</Button>
+              <form className="mt-6 flex flex-col gap-3 sm:flex-row" onSubmit={(event) => { event.preventDefault(); const name = companyName.trim(); if (!name) return; createCompanyMutation.mutate(name); }}>
+                <Input value={companyName} onChange={(event) => setCompanyName(event.target.value)} placeholder="Nome da empresa" aria-label="Nome da empresa" className="h-12 bg-background" maxLength={120} />
+                <Button type="submit" disabled={!companyName.trim() || createCompanyMutation.isPending} className="h-12 shrink-0 bg-brand-green text-brand-green-foreground hover:bg-brand-green/90">
+                  <Plus aria-hidden="true" />{createCompanyMutation.isPending ? "A cadastrar…" : "Cadastrar empresa"}
+                </Button>
               </form>
-              <div className="mt-6 space-y-2"><h3 className="text-sm font-semibold">Empresas disponíveis</h3>{companies.map((company) => <div key={company} className="rounded-md border border-border px-4 py-3 text-sm">{company}</div>)}</div>
             </div>
-            )}
+            <div className="rounded-xl border border-border bg-card p-5 shadow-sm sm:p-7">
+              <div className="flex items-center justify-between gap-3 border-b border-border pb-4">
+                <div>
+                  <h2 className="font-display text-xl font-semibold">Empresas cadastradas</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">Empresas disponíveis para novas vistorias.</p>
+                </div>
+                <Badge variant="secondary">{data.companies.length}</Badge>
+              </div>
+              <div className="divide-y divide-border">
+                {data.companies.length ? data.companies.map((company) => (
+                  <div key={company.id} className="flex items-center gap-3 py-4">
+                    <span className="grid size-10 place-items-center rounded-lg bg-muted text-brand-navy"><Store className="size-5" aria-hidden="true" /></span>
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium">{company.name}</span>
+                    <Badge variant="outline">Activa</Badge>
+                  </div>
+                )) : <p className="py-8 text-center text-sm text-muted-foreground">Ainda não existem empresas cadastradas.</p>}
+              </div>
+            </div>
           </section>
         ) : null}
 
