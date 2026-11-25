@@ -565,7 +565,6 @@ function Index() {
             {fieldStarted || activeVisit ? (
               <section className="space-y-6">
                 <div className="min-w-0 rounded-md border border-border bg-card p-4 shadow-sm sm:p-6">
-              <div className="mb-3 flex items-center justify-between gap-3">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <div>
                     <p className="text-xs font-semibold uppercase text-muted-foreground">02 · Encontrar produto</p>
@@ -701,7 +700,6 @@ function Index() {
                   <p className="mt-3 text-center text-xs text-muted-foreground">Seleccione a empresa e inicie a vistoria para registar produtos.</p>
                 ) : null}
               </div>
-            </div>
 
             <div className="min-w-0 rounded-md border border-border bg-card p-4 shadow-sm sm:p-6">
               <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4">
@@ -812,7 +810,8 @@ function Index() {
                 </Button>
               </div>
             </div>
-              ) : null}
+              </section>
+            ) : null}
           </section>
         ) : null}
 
