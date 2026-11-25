@@ -1,27 +1,5 @@
 {
   "version": "7",
   "dialect": "postgresql",
-  "entries": [
-    {
-      "idx": 0,
-      "version": "7",
-      "when": 1795423801911,
-      "tag": "0000_create_field_visits",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1795588235899,
-      "tag": "0001_restrict_field_visits_to_authenticated",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1795588355989,
-      "tag": "0002_lock_visit_code_trigger_function",
-      "breakpoints": true
-    }
-  ]
+  "entries": []
 }
