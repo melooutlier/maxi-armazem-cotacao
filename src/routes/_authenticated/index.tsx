@@ -51,8 +51,7 @@ import {
 } from "@/lib/field-visits";
 import { supabase } from "@/integrations/supabase/client";
 
-type ViewMode = "menu" | "field" | "office" | "history" | "cadastro";
-type ViewMode = "menu" | "field" | "office" | "history" | "companies";
+type ViewMode = "menu" | "field" | "office" | "history" | "cadastro" | "companies";
 
 export const Route = createFileRoute("/_authenticated/")({
   loader: ({ context }) => context.queryClient.ensureQueryData(fieldVisitQueryOptions),
@@ -107,7 +106,6 @@ function Index() {
   const [searchText, setSearchText] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<CatalogProduct | null>(null);
   const [quantityText, setQuantityText] = useState("1");
-  const [companyName, setCompanyName] = useState("");
   const [clock, setClock] = useState<Date | null>(null);
 
   useEffect(() => {
@@ -560,10 +558,8 @@ function Index() {
               <span className="size-2 rounded-full bg-success" />
               Sistema de gestão flexível
             </p>
-            <h1 className="font-display text-3xl font-semibold tracking-normal text-foreground sm:text-4xl">
-              {mode === "menu" ? "Área de trabalho" : mode === "field" ? "Vistoria em campo" : mode === "office" ? "Lançamento no escritório" : mode === "cadastro" ? "Cadastro" : "Histórico & relatórios"}
             <h1 className={`font-display font-semibold tracking-normal text-foreground ${mode === "field" && !fieldStarted && !activeVisit ? "text-lg" : "text-3xl sm:text-4xl"}`}>
-              {mode === "menu" ? "Área de trabalho" : mode === "field" ? "Vistoria em campo" : mode === "office" ? "Lançamento no escritório" : mode === "companies" ? "Cadastro de empresas" : "Histórico & relatórios"}
+              {mode === "menu" ? "Área de trabalho" : mode === "field" ? "Vistoria em campo" : mode === "office" ? "Lançamento no escritório" : mode === "companies" || mode === "cadastro" ? "Cadastro de empresas" : "Histórico & relatórios"}
             </h1>
             <p className={`mt-1 max-w-2xl text-sm leading-5 text-muted-foreground sm:text-base ${mode === "field" && !fieldStarted && !activeVisit ? "hidden" : ""}`}>
               {mode === "menu"
@@ -572,11 +568,8 @@ function Index() {
                   ? (fieldStarted || activeVisit ? "Pesquise os produtos no catálogo e registe as faltas da empresa." : "Escolha a empresa para iniciar uma nova vistoria.")
                   : mode === "office"
                     ? "Transfira os pedidos para o sistema central e acompanhe cada lançamento."
-                    : mode === "cadastro"
-                      ? "Gira o cadastro das empresas utilizadas nas vistorias."
-                      : "Acompanhe as vistorias realizadas e o estado dos lançamentos."}
-                    : mode === "companies"
-                      ? "Cadastre as empresas para as quais a Maxi Armazém realiza vistorias e descontos."
+                    : mode === "companies" || mode === "cadastro"
+                      ? "Cadastre e gira as empresas utilizadas nas vistorias."
                       : "Acompanhe o ritmo das vistorias e as reposições pendentes."}
             </p>
           </div>
@@ -589,14 +582,24 @@ function Index() {
         </div>
 
         {mode === "menu" ? (
-          <section className="mx-auto grid max-w-5xl gap-5 py-8 md:grid-cols-2 xl:grid-cols-4">
           <section className="mx-auto grid max-w-6xl gap-5 py-8 sm:grid-cols-2 xl:grid-cols-4">
             {MODES.map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
                 type="button"
-                onClick={() => { setMode(id); if (id === "office") { setOfficeEntered(false); setOfficeCompany(""); setOfficeVisitId(""); } if (id === "cadastro") setCadastroSection(false); }}
-                onClick={() => { setMode(id); if (id === "field") { setFieldStarted(false); setIsPriority(null); } }}
+                onClick={() => {
+                  setMode(id);
+                  if (id === "field") {
+                    setFieldStarted(false);
+                    setIsPriority(null);
+                  }
+                  if (id === "office") {
+                    setOfficeEntered(false);
+                    setOfficeCompany("");
+                    setOfficeVisitId("");
+                  }
+                  if (id === "cadastro") setCadastroSection(false);
+                }}
                 className="group flex min-h-56 flex-col items-start justify-between rounded-xl border border-border bg-card p-7 text-left shadow-sm transition hover:-translate-y-1 hover:border-brand-green hover:shadow-md"
               >
                 <span className="grid size-14 place-items-center rounded-xl bg-brand-green/15 text-brand-navy">
@@ -605,7 +608,6 @@ function Index() {
                 <span>
                   <span className="block font-display text-2xl font-semibold">{label}</span>
                   <span className="mt-2 block text-sm text-muted-foreground">
-                    {id === "field" ? "Iniciar e registar uma vistoria nas lojas." : id === "office" ? "Consultar listas e preparar lançamentos." : id === "history" ? "Consultar vistorias e relatórios anteriores." : "Registar e gerir empresas."}
                     {id === "field" ? "Iniciar e registar uma vistoria nas lojas." : id === "office" ? "Consultar listas e preparar lançamentos." : id === "history" ? "Consultar vistorias e indicadores anteriores." : "Cadastrar e gerir as empresas onde são feitas as vistorias."}
                   </span>
                 </span>
@@ -636,36 +638,6 @@ function Index() {
           </section>
         ) : null}
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className="grid gap-2 text-sm font-medium">
-                  Empresa
-                  <Select value={selectedStore} onValueChange={setSelectedStore} disabled={Boolean(activeVisit)}>
-                    <SelectTrigger className="h-12 bg-background text-left">
-                      <SelectValue placeholder="Escolha a loja" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {companies.map((store) => (
-                        <SelectItem key={store} value={store}>
-                          {store}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </label>
-               </div>
-
-              <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <CalendarDays className="size-4" aria-hidden="true" />
-                  {clock
-                    ? new Intl.DateTimeFormat("pt-MZ", {
-                        day: "2-digit",
-                        month: "long",
-                        year: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      }).format(clock)
-                    : "Data e hora automáticas"}
         {mode === "field" ? (
           <section className={mode === "field" && !fieldStarted && !activeVisit ? "flex min-h-0 flex-1 flex-col" : "space-y-6"}>
             {!fieldStarted && !activeVisit ? (
@@ -1143,7 +1115,6 @@ function Index() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todos os supermercados</SelectItem>
-                      {companies.map((store) => <SelectItem key={store} value={store}>{store}</SelectItem>)}
                       {data.companies.map((company) => <SelectItem key={company.id} value={company.name}>{company.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
