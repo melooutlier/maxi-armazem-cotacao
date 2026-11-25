@@ -1,3 +1,8 @@
 - [x] Aprovar plano e preparar Lovable Cloud para persistir vistorias.
 - [x] Construir os modos Campo, Escritório e Histórico & Relatórios com catálogo de Maputo.
-- [ ] Validar conclusão, cópia/exportação e histórico; revisar metadados e estado do projeto.
+- [x] Atualizar o indicador de economia para 20 minutos por vistoria.
+- [x] Confirmar perfis personalizados, descontos percentuais e limites de stock por produto.
+- [ ] Implementar login com perfis e restringir vistorias a utilizadores autenticados.
+- [ ] Implementar cadastro de empresas, prioridades opcionais e cópia no formato do ERP.
+- [ ] Ligar o stock ao ERP (aguardando o nome do sistema e a disponibilidade de integração).
+- [ ] Validar os fluxos, os avisos de segurança, os metadados e os testes; guardar as alterações.

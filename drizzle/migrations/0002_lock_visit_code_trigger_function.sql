@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.assign_visit_code() FROM PUBLIC, anon, authenticated;

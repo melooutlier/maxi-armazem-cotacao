@@ -943,7 +943,7 @@ function Index() {
               <Metric
                 icon={<Activity className="size-5" aria-hidden="true" />}
                 label="Economia estimada por vistoria"
-                value="≈ 10 min"
+                value="≈ 20 min"
                 note="Estimativa provisória · por visita concluída"
               />
             </div>

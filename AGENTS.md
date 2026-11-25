@@ -30,4 +30,4 @@ use the editor.
 <!-- LOVABLE:END -->
 
 ## Application architecture
-- Keep shared inspection state in Lovable Cloud `visits` and `visit_items` tables; the brief has no sign-in or per-user permission model, so access is intentionally shared.
+- Keep shared inspection state in Lovable Cloud `visits` and `visit_items` tables, visible only to signed-in staff so the team can coordinate without exposing records publicly.
