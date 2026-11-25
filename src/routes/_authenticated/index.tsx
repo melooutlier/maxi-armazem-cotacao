@@ -491,15 +491,24 @@ function Index() {
     toast.success(`${pendingItems.length} produto(s) marcado(s) como lançado(s).`);
   };
 
+  const formatPrimaveraQuantity = (quantity: number) =>
+    quantity.toLocaleString("pt-MZ", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const getPrimaveraRow = (item: VisitItem) => {
+    if (!officeVisit) return [];
+    const totalDiscount = 100 * (1 - (1 - officeVisit.discount_percent / 100) * (1 - item.discount_percent / 100));
+    // Primavera: Artigo, Arm., Localização, Lote, Descrição, CIVA, IVA, Pr. Unit., Desc., UN, Qtd., Total Liq., Contrato
+    return [
+      item.product_code, "", "", "", item.product_name, "", "", "",
+      totalDiscount.toLocaleString("pt-MZ", { maximumFractionDigits: 2 }), item.unit,
+      formatPrimaveraQuantity(item.quantity), "", "",
+    ];
+  };
+
   const handleCopyAll = () => {
     if (!officeVisit) return;
-    const lines = [
-      ["Código do produto", "Nome/descrição", "Quantidade em falta", "Desconto individual (%)", "Desconto geral (%)"].join("\t"),
-      ...officeItems.map((item) =>
-        [item.product_code, item.product_name, item.quantity, item.discount_percent, officeVisit.discount_percent].join("\t"),
-      ),
-    ];
-    void handleCopy(lines.join("\n"), "Lista copiada para o lançamento.");
+    const lines = officeItems.map((item) => getPrimaveraRow(item).join("\t"));
+    void handleCopy(lines.join("\n"), "Lista formatada para colar no Primavera.");
   };
 
   const handleExportCsv = () => {
@@ -1110,9 +1119,11 @@ function Index() {
                   <table className="w-full min-w-[760px] border-collapse text-left text-sm">
                     <thead className="bg-muted text-xs uppercase text-muted-foreground">
                       <tr>
-                        <th className="px-4 py-3 font-semibold">Código do produto</th>
-                        <th className="px-4 py-3 font-semibold">Nome / descrição</th>
-                        <th className="px-4 py-3 font-semibold">Quantidade</th>
+                        <th className="px-4 py-3 font-semibold">Artigo</th>
+                        <th className="px-4 py-3 font-semibold">Descrição</th>
+                        <th className="px-4 py-3 font-semibold">Desc.</th>
+                        <th className="px-4 py-3 font-semibold">UN</th>
+                        <th className="px-4 py-3 font-semibold">Qtd.</th>
                         <th className="px-4 py-3 font-semibold">Copiar</th>
                         <th className="px-4 py-3 font-semibold">Lançado no ERP</th>
                       </tr>
@@ -1123,16 +1134,17 @@ function Index() {
                           <td className="whitespace-nowrap px-4 py-4 font-mono text-xs">{item.product_code}</td>
                           <td className="px-4 py-4">
                             <p className={`font-medium ${item.launched ? "line-through" : ""}`}>{item.product_name}</p>
-                            <p className="mt-1 text-xs text-muted-foreground">{item.category}</p><p className="mt-1 text-xs text-success">Desconto individual: {item.discount_percent}% · Desconto total aplicado: {(100 * (1 - (1 - officeVisit.discount_percent / 100) * (1 - item.discount_percent / 100))).toLocaleString("pt-MZ", { maximumFractionDigits: 2 })}%</p>
                           </td>
-                          <td className="whitespace-nowrap px-4 py-4 font-semibold tabular-nums">{item.quantity} {item.unit}</td>
+                          <td className="whitespace-nowrap px-4 py-4 tabular-nums">{(100 * (1 - (1 - officeVisit.discount_percent / 100) * (1 - item.discount_percent / 100))).toLocaleString("pt-MZ", { maximumFractionDigits: 2 })}%</td>
+                          <td className="whitespace-nowrap px-4 py-4">{item.unit}</td>
+                          <td className="whitespace-nowrap px-4 py-4 font-semibold tabular-nums">{formatPrimaveraQuantity(item.quantity)}</td>
                           <td className="px-4 py-4">
                             <Button
                               type="button"
                               variant="outline"
                               size="sm"
-                              aria-label={`Copiar código e quantidade de ${item.product_name}`}
-                              onClick={() => void handleCopy(`${item.product_code}\t${item.quantity}`, "Código e quantidade copiados.")}
+                              aria-label={`Copiar linha de ${item.product_name} para o Primavera`}
+                              onClick={() => void handleCopy(getPrimaveraRow(item).join("\t"), "Linha formatada para colar no Primavera.")}
                             >
                               <Copy aria-hidden="true" /> Copiar
                             </Button>
