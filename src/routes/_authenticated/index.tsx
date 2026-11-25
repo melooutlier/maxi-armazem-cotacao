@@ -48,6 +48,7 @@ import {
   fieldVisitQueryOptions,
   formatDateTime,
   formatDuration,
+  getStockLevel,
   localDateValue,
   type CatalogProduct,
   type Priority,
@@ -107,7 +108,7 @@ function Index() {
   const [searchText, setSearchText] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<CatalogProduct | null>(null);
   const [quantityText, setQuantityText] = useState("1");
-  const [priority, setPriority] = useState<Priority>("Normal");
+  const [priority, setPriority] = useState<Priority | null>(null);
   const [clock, setClock] = useState<Date | null>(null);
 
   useEffect(() => {
@@ -171,7 +172,7 @@ function Index() {
       visitId: string;
       product: CatalogProduct;
       quantity: number;
-      priority: Priority;
+      priority: Priority | null;
     }) => {
       const existing = data.items.find(
         (item) => item.visit_id === input.visitId && item.product_code === input.product.code,
@@ -179,8 +180,10 @@ function Index() {
       const result = existing
         ? await supabase
             .from("visit_items")
-            .update({ quantity: addQuantity(existing.quantity, input.quantity), priority: input.priority })
+            .update({ quantity: addQuantity(existing.quantity, input.quantity), priority: input.priority ?? "" })
             .eq("id", existing.id)
+            .select()
+            .single()
         : await supabase.from("visit_items").insert({
             visit_id: input.visitId,
             product_code: input.product.code,
@@ -188,11 +191,22 @@ function Index() {
             category: input.product.category,
             unit: input.product.unit,
             quantity: input.quantity,
-            priority: input.priority,
-          });
+            priority: input.priority ?? "",
+          }).select().single();
       if (result.error) throw result.error;
+      return result.data as VisitItem;
     },
-    onSuccess: async () => {
+    onSuccess: async (savedItem) => {
+      queryClient.setQueryData(fieldVisitQueryOptions.queryKey, (current: typeof data | undefined) => {
+        if (!current) return current;
+        const exists = current.items.some((item) => item.id === savedItem.id);
+        return {
+          ...current,
+          items: exists
+            ? current.items.map((item) => item.id === savedItem.id ? savedItem : item)
+            : [...current.items, savedItem],
+        };
+      });
       await refreshVisits();
       setSearchText("");
       setSelectedProduct(null);
@@ -354,7 +368,7 @@ function Index() {
     const lines = [
       ["Código do produto", "Nome/descrição", "Quantidade em falta", "Prioridade"].join("\t"),
       ...officeItems.map((item) =>
-        [item.product_code, item.product_name, item.quantity, item.priority].join("\t"),
+        [item.product_code, item.product_name, item.quantity, item.priority || ""].join("\t"),
       ),
     ];
     void handleCopy(lines.join("\n"), "Lista copiada para o lançamento.");
@@ -382,7 +396,7 @@ function Index() {
           item.product_name,
           item.quantity,
           item.unit,
-          item.priority,
+          item.priority || "",
           item.launched ? "Sim" : "Não",
         ].map(quote),
       ),
@@ -623,8 +637,11 @@ function Index() {
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold">{selectedProduct.name}</p>
                       <p className="text-xs text-muted-foreground">{selectedProduct.code} · {selectedProduct.category}</p>
+                      <p className="mt-1 text-xs font-semibold">Stock disponível: {selectedProduct.stock} unidades</p>
                     </div>
-                    <Badge variant="outline" className="bg-background">{selectedProduct.unit}</Badge>
+                    <Badge variant="outline" className={getStockLevel(selectedProduct.stock) === "very-low" ? "border-red-200 bg-red-50 text-red-700" : getStockLevel(selectedProduct.stock) === "low" ? "border-amber-200 bg-amber-50 text-amber-700" : "border-green-200 bg-green-50 text-green-700"}>
+                      {getStockLevel(selectedProduct.stock) === "very-low" ? "Stock muito baixo" : getStockLevel(selectedProduct.stock) === "low" ? "Stock baixo" : "Stock bom"}
+                    </Badge>
                   </div>
                 ) : null}
 
@@ -667,8 +684,12 @@ function Index() {
                 </div>
 
                 <div className="mt-5 grid gap-2 text-sm font-medium">
-                  Prioridade
-                  <div className="grid grid-cols-3 gap-2">
+                  Prioridade <span className="font-normal text-muted-foreground">(opcional)</span>
+                  <div className="grid grid-cols-4 gap-2">
+                    <Button type="button" variant="outline" aria-pressed={priority === null} disabled={!activeVisit} onClick={() => setPriority(null)} className={`h-11 px-2 ${priority === null ? "border-primary bg-primary/10 text-primary" : "bg-background"}`}>
+                      {priority === null && <Check className="size-4" aria-hidden="true" />}
+                      Sem prioridade
+                    </Button>
                     {PRIORITIES.map((choice) => (
                       <Button
                         key={choice}
@@ -729,9 +750,7 @@ function Index() {
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
                             <p className="truncate text-sm font-semibold">{item.product_name}</p>
-                            <Badge className={`px-2 py-0.5 ${priorityStyles[item.priority as Priority] ?? priorityStyles.Normal}`}>
-                              {item.priority}
-                            </Badge>
+                            {item.priority ? <Badge className={`px-2 py-0.5 ${priorityStyles[item.priority as Priority] ?? priorityStyles.Normal}`}>{item.priority}</Badge> : null}
                           </div>
                           <p className="mt-1 text-xs text-muted-foreground">{item.product_code} · {item.category}</p>
                         </div>
@@ -884,7 +903,7 @@ function Index() {
                           </td>
                           <td className="whitespace-nowrap px-4 py-4 font-semibold tabular-nums">{item.quantity} {item.unit}</td>
                           <td className="px-4 py-4">
-                            <Badge className={priorityStyles[item.priority as Priority] ?? priorityStyles.Normal}>{item.priority}</Badge>
+                            {item.priority ? <Badge className={priorityStyles[item.priority as Priority] ?? priorityStyles.Normal}>{item.priority}</Badge> : <span className="text-xs text-muted-foreground">—</span>}
                           </td>
                           <td className="px-4 py-4">
                             <Button
