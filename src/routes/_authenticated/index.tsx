@@ -435,7 +435,7 @@ function Index() {
               Sistema de gestão flexível
             </p>
             <h1 className="font-display text-3xl font-semibold tracking-normal text-foreground sm:text-4xl">
-              {mode === "menu" ? "Área de trabalho" : mode === "field" ? "Vistoria em campo" : mode === "office" ? "Lançamento no escritório" : "Histórico & relatórios"}
+              {mode === "menu" ? "Área de trabalho" : mode === "field" ? "Vistoria em campo" : mode === "office" ? "Lançamento no escritório" : mode === "cadastro" ? "Cadastro" : "Histórico & relatórios"}
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
               {mode === "menu"
@@ -444,7 +444,9 @@ function Index() {
                   ? "Registe as faltas da loja com rapidez e siga para a próxima secção."
                   : mode === "office"
                     ? "Transfira os pedidos para o sistema central e acompanhe cada lançamento."
-                    : "Acompanhe o ritmo das vistorias e as reposições pendentes."}
+                    : mode === "cadastro"
+                      ? "Gira o cadastro das empresas utilizadas nas vistorias."
+                      : "Acompanhe as vistorias realizadas e o estado dos lançamentos."}
             </p>
           </div>
           {mode === "field" && activeVisit ? (
