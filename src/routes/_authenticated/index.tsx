@@ -377,6 +377,24 @@ function Index() {
 
   const activeCompanies = data.companies.filter((company) => company.active);
   const companies = activeCompanies.map((company) => company.name);
+  const fieldPendingVisits = data.visits
+    .filter((visit) => {
+      const items = data.items.filter((item) => item.visit_id === visit.id);
+      return visit.status === "completed" && items.some((item) => !item.launched);
+    })
+    .sort((a, b) => Date.parse(b.started_at) - Date.parse(a.started_at));
+  const fieldCompletedVisits = data.visits
+    .filter((visit) => {
+      const items = data.items.filter((item) => item.visit_id === visit.id);
+      return visit.status === "launched" || (visit.status === "completed" && items.length > 0 && items.every((item) => item.launched));
+    })
+    .sort((a, b) => Date.parse(b.started_at) - Date.parse(a.started_at));
+  const openVisitInOffice = (visit: Visit) => {
+    setOfficeVisitId(visit.id);
+    setOfficeCompany(visit.supermarket);
+    setOfficeEntered(true);
+    setMode("office");
+  };
   const officeVisits = data.visits.filter((visit) => {
     const visitDay = localDateValue(visit.started_at);
     return visit.status !== "in_progress" &&
@@ -660,49 +678,113 @@ function Index() {
         {mode === "field" ? (
           <section className={mode === "field" && !fieldStarted && !activeVisit ? "flex min-h-0 flex-1 flex-col" : "space-y-6"}>
             {!fieldStarted && !activeVisit ? (
-              <section className="grid min-h-0 flex-1 place-items-center overflow-hidden py-1">
-                <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-3 shadow-lg sm:p-4">
-                  <div className="mx-auto mb-2 grid size-9 place-items-center rounded-xl bg-brand-green/15 text-brand-navy sm:size-10">
-                    <Store className="size-5" aria-hidden="true" />
+              <div className="space-y-6">
+                <section className="rounded-xl border border-border bg-card p-4 shadow-sm sm:p-6">
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wider text-warning-foreground">A aguardar lançamento</p>
+                      <h2 className="mt-1 font-display text-xl font-semibold">Vistorias por lançar no sistema</h2>
+                      <p className="mt-1 text-sm text-muted-foreground">As vistorias mais recentes aparecem primeiro.</p>
+                    </div>
+                    <Badge variant="secondary">{fieldPendingVisits.length} pendentes</Badge>
                   </div>
-                  <div className="text-center">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-success">Vistoria de campo</p>
-                    <h2 className="mt-2 font-display text-2xl font-semibold">Escolher empresa</h2>
-                    <p className="mt-1 text-xs leading-4 text-muted-foreground">Seleccione a empresa onde pretende realizar a vistoria.</p>
-                  </div>
-                  <label className="mt-3 grid gap-1 text-sm font-medium">
-                    Empresa
-                    <Select value={selectedStore} onValueChange={setSelectedStore}>
-                      <SelectTrigger className="h-10 bg-background text-left">
-                        <SelectValue placeholder="Escolha a empresa" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {data.companies.map((company) => (
-                          <SelectItem key={company.id} value={company.name}>{company.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </label>
-                  <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-                    <CalendarDays className="size-4" aria-hidden="true" />
-                    {clock
-                      ? new Intl.DateTimeFormat("pt-MZ", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(clock)
-                      : "Data e hora automáticas"}
-                  </div>
-                  <Button
-                    type="button"
-                    size="lg"
-                    disabled={!selectedStore || startVisitMutation.isPending}
-                    onClick={handleStartVisit}
-                    className="mt-3 h-10 w-full bg-brand-green text-brand-green-foreground hover:bg-brand-green/90"
-                  >
-                    {startVisitMutation.isPending ? "A iniciar vistoria…" : "Iniciar vistoria"}
-                    <ArrowRight aria-hidden="true" />
-                  </Button>
-                </div>
-              </section>
-            ) : null}
+                  {fieldPendingVisits.length ? (
+                    <div className="divide-y divide-border">
+                      {fieldPendingVisits.map((visit) => {
+                        const items = data.items.filter((item) => item.visit_id === visit.id);
+                        const pendingCount = items.filter((item) => !item.launched).length;
+                        return (
+                          <article key={visit.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center">
+                            <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-warning/10 text-warning-foreground"><ClipboardList className="size-5" aria-hidden="true" /></div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h3 className="truncate font-semibold">{visit.supermarket}</h3>
+                                <Badge variant="outline" className="font-mono text-xs">{visit.visit_code ?? "Sem código"}</Badge>
+                                <Badge className="border-warning/20 bg-warning/10 text-warning-foreground">Por lançar</Badge>
+                              </div>
+                              <p className="mt-1 text-xs text-muted-foreground">{formatDateTime(visit.started_at)} · {visit.operator_name} · {items.length} produtos · {pendingCount} por lançar</p>
+                            </div>
+                            <Button type="button" onClick={() => openVisitInOffice(visit)} className="shrink-0 bg-brand-green text-brand-green-foreground hover:bg-brand-green/90">Abrir lançamento <ArrowRight aria-hidden="true" /></Button>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-dashed border-border py-8 text-center">
+                      <CheckCircle2 className="mx-auto size-7 text-success" aria-hidden="true" />
+                      <p className="mt-2 text-sm font-medium">Não existem vistorias por lançar</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Quando uma vistoria for concluída no Campo, aparecerá aqui.</p>
+                    </div>
+                  )}
+                </section>
 
+                <section className="rounded-xl border border-border bg-card p-4 shadow-sm sm:p-6">
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wider text-success">Lançamento concluído</p>
+                      <h2 className="mt-1 font-display text-xl font-semibold">Vistorias concluídas</h2>
+                      <p className="mt-1 text-sm text-muted-foreground">Vistorias já lançadas no sistema.</p>
+                    </div>
+                    <Badge variant="secondary">{fieldCompletedVisits.length} concluídas</Badge>
+                  </div>
+                  {fieldCompletedVisits.length ? (
+                    <div className="divide-y divide-border">
+                      {fieldCompletedVisits.map((visit) => {
+                        const items = data.items.filter((item) => item.visit_id === visit.id);
+                        return (
+                          <article key={visit.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center">
+                            <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-success/10 text-success"><CheckCircle2 className="size-5" aria-hidden="true" /></div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h3 className="truncate font-semibold">{visit.supermarket}</h3>
+                                <Badge variant="outline" className="font-mono text-xs">{visit.visit_code ?? "Sem código"}</Badge>
+                                <Badge className="border-success/20 bg-success/10 text-success">Concluída</Badge>
+                              </div>
+                              <p className="mt-1 text-xs text-muted-foreground">{formatDateTime(visit.started_at)} · {visit.operator_name} · {items.length} produtos</p>
+                            </div>
+                            <Button type="button" variant="outline" onClick={() => openVisitInOffice(visit)} className="shrink-0">Consultar <ArrowRight aria-hidden="true" /></Button>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-dashed border-border py-8 text-center">
+                      <History className="mx-auto size-7 text-muted-foreground" aria-hidden="true" />
+                      <p className="mt-2 text-sm font-medium">Ainda não existem vistorias concluídas</p>
+                    </div>
+                  )}
+                </section>
+
+                <section className="grid min-h-0 place-items-center overflow-hidden py-1">
+                  <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-3 shadow-lg sm:p-4">
+                    <div className="mx-auto mb-2 grid size-9 place-items-center rounded-xl bg-brand-green/15 text-brand-navy sm:size-10">
+                      <Store className="size-5" aria-hidden="true" />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-success">Nova vistoria de campo</p>
+                      <h2 className="mt-2 font-display text-2xl font-semibold">Escolher empresa</h2>
+                      <p className="mt-1 text-xs leading-4 text-muted-foreground">Seleccione a empresa onde pretende realizar uma nova vistoria.</p>
+                    </div>
+                    <label className="mt-3 grid gap-1 text-sm font-medium">
+                      Empresa
+                      <Select value={selectedStore} onValueChange={setSelectedStore}>
+                        <SelectTrigger className="h-10 bg-background text-left"><SelectValue placeholder="Escolha a empresa" /></SelectTrigger>
+                        <SelectContent>
+                          {activeCompanies.map((company) => <SelectItem key={company.id} value={company.name}>{company.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </label>
+                    <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                      <CalendarDays className="size-4" aria-hidden="true" />
+                      {clock ? new Intl.DateTimeFormat("pt-MZ", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(clock) : "Data e hora automáticas"}
+                    </div>
+                    <Button type="button" size="lg" disabled={!selectedStore || startVisitMutation.isPending} onClick={handleStartVisit} className="mt-3 h-10 w-full bg-brand-green text-brand-green-foreground hover:bg-brand-green/90">
+                      {startVisitMutation.isPending ? "A iniciar vistoria…" : "Iniciar nova vistoria"}<ArrowRight aria-hidden="true" />
+                    </Button>
+                  </div>
+                </section>
+              </div>
+            ) : null}
             {fieldStarted || activeVisit ? (
               <section className="space-y-6">
                 <div className="min-w-0 rounded-md border border-border bg-card p-4 shadow-sm sm:p-6">
