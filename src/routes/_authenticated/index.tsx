@@ -106,6 +106,7 @@ function Index() {
   const [showCompletedVisits, setShowCompletedVisits] = useState(false);
   const [officeDateFrom, setOfficeDateFrom] = useState("");
   const [officeDateTo, setOfficeDateTo] = useState("");
+  const [officeCompanyFilter, setOfficeCompanyFilter] = useState("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [searchText, setSearchText] = useState("");
@@ -379,7 +380,9 @@ function Index() {
   const companies = activeCompanies.map((company) => company.name);
   const officeVisits = data.visits.filter((visit) => {
     const visitDay = localDateValue(visit.started_at);
+    const matchesCompany = officeCompanyFilter === "all" || visit.supermarket === officeCompanyFilter;
     return visit.status !== "in_progress" &&
+      matchesCompany &&
       (!officeDateFrom || visitDay >= officeDateFrom) &&
       (!officeDateTo || visitDay <= officeDateTo);
   });
@@ -395,12 +398,21 @@ function Index() {
     const items = data.items.filter((item) => item.visit_id === visit.id);
     return visit.status === "launched" || (items.length > 0 && items.every((item) => item.launched));
   };
-  const fieldPendingVisits = data.visits.filter((visit) => visit.status === "completed" && !isVisitFullyLaunched(visit));
-  const fieldCompletedVisits = data.visits.filter((visit) => visit.status !== "in_progress" && isVisitFullyLaunched(visit));
+  const matchesOfficeFilters = (visit: Visit) => {
+    const visitDay = localDateValue(visit.started_at);
+    const matchesCompany = officeCompanyFilter === "all" || visit.supermarket === officeCompanyFilter;
+    return matchesCompany &&
+      (!officeDateFrom || visitDay >= officeDateFrom) &&
+      (!officeDateTo || visitDay <= officeDateTo);
+  };
+  const fieldPendingVisits = data.visits
+    .filter((visit) => visit.status === "completed" && !isVisitFullyLaunched(visit) && matchesOfficeFilters(visit))
+    .sort((a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime());
+  const fieldCompletedVisits = data.visits
+    .filter((visit) => visit.status !== "in_progress" && isVisitFullyLaunched(visit) && matchesOfficeFilters(visit))
+    .sort((a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime());
   const openVisitInOffice = (visit: Visit) => {
     setOfficeEntered(true);
-    setOfficeDateFrom("");
-    setOfficeDateTo("");
     setOfficeVisitId(visit.id);
     setMode("office");
   };
@@ -983,6 +995,34 @@ function Index() {
             {!officeEntered ? (
             <div className="mb-7 space-y-5">
                 <section className="rounded-xl border border-border bg-card p-4 shadow-sm sm:p-6">
+                  <div className="mb-4">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Filtrar vistorias</p>
+                    <h2 className="mt-1 font-display text-lg font-semibold">Período e empresa</h2>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <label className="grid gap-2 text-sm font-medium">Data inicial
+                      <Input type="date" value={officeDateFrom} onChange={(event) => setOfficeDateFrom(event.target.value)} className="h-11 bg-background" />
+                    </label>
+                    <label className="grid gap-2 text-sm font-medium">Data final
+                      <Input type="date" value={officeDateTo} onChange={(event) => setOfficeDateTo(event.target.value)} className="h-11 bg-background" />
+                    </label>
+                    <label className="grid gap-2 text-sm font-medium">Empresa
+                      <Select value={officeCompanyFilter} onValueChange={setOfficeCompanyFilter}>
+                        <SelectTrigger className="h-11 bg-background"><SelectValue placeholder="Todas as empresas" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todas as empresas</SelectItem>
+                          {data.companies.map((company) => <SelectItem key={company.id} value={company.name}>{company.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </label>
+                    <div className="flex items-end">
+                      <Button type="button" variant="outline" className="h-11 w-full" onClick={() => { setOfficeDateFrom(""); setOfficeDateTo(""); setOfficeCompanyFilter("all"); }}>
+                        Limpar filtros
+                      </Button>
+                    </div>
+                  </div>
+                </section>
+                <section className="rounded-xl border border-border bg-card p-4 shadow-sm sm:p-6">
                   <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wider text-warning-foreground">A aguardar lançamento</p>
@@ -1064,14 +1104,6 @@ function Index() {
                   <h2 className="font-display text-xl font-semibold">{officeVisit?.supermarket ?? "Detalhes da vistoria"}</h2>
                 </div>
                 <Button type="button" variant="outline" onClick={() => { setOfficeEntered(false); setOfficeVisitId(""); }}>Voltar à visão geral</Button>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="grid gap-2 text-sm font-medium">Data inicial
-                  <Input type="date" value={officeDateFrom} onChange={(event) => { setOfficeDateFrom(event.target.value); setOfficeVisitId(""); }} className="h-11 bg-card" />
-                </label>
-                <label className="grid gap-2 text-sm font-medium">Data final
-                  <Input type="date" value={officeDateTo} onChange={(event) => { setOfficeDateTo(event.target.value); setOfficeVisitId(""); }} className="h-11 bg-card" />
-                </label>
               </div>
               <label className="grid w-full max-w-xl gap-2 text-sm font-medium">
                 Vistoria para lançamento
