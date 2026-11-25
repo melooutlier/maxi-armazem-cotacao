@@ -614,7 +614,7 @@ function Index() {
               Sistema de gestão flexível
             </p>
             <h1 className={`font-display font-semibold tracking-normal text-foreground ${mode === "field" && !fieldStarted && !activeVisit ? "text-lg" : "text-3xl sm:text-4xl"}`}>
-              {mode === "menu" ? "Área de trabalho" : mode === "field" ? "Vistoria em campo" : mode === "office" ? "Lançamento no escritório" : mode === "cadastro" ? "Cadastro" : "Histórico & relatórios"}
+              {mode === "menu" ? "Área de trabalho" : mode === "field" ? "Vistoria em campo" : mode === "office" ? (officeEntered ? "Detalhes da vistoria" : "Lançamento no escritório") : mode === "cadastro" ? "Cadastro" : "Histórico & relatórios"}
             </h1>
             <p className={`mt-1 max-w-2xl text-sm leading-5 text-muted-foreground sm:text-base ${mode === "field" && !fieldStarted && !activeVisit ? "hidden" : ""}`}>
               {mode === "menu"
@@ -622,7 +622,7 @@ function Index() {
                 : mode === "field"
                   ? (fieldStarted || activeVisit ? "Pesquise os produtos no catálogo e registe as faltas da empresa." : "Escolha a empresa para iniciar uma nova vistoria.")
                   : mode === "office"
-                    ? "Transfira os pedidos para o sistema central e acompanhe cada lançamento."
+                    ? (officeEntered ? "Consulte os produtos da vistoria e registe os lançamentos no sistema." : "Transfira os pedidos para o sistema central e acompanhe cada lançamento.")
                     : mode === "cadastro"
                       ? "Cadastre e consulte as empresas utilizadas nas vistorias."
                       : "Acompanhe o ritmo das vistorias e as reposições pendentes."}
@@ -971,6 +971,7 @@ function Index() {
 
         {mode === "office" ? (
           <section className="space-y-6">
+            {!officeEntered ? (
             <div className="mb-7 space-y-5">
                 <section className="rounded-xl border border-border bg-card p-4 shadow-sm sm:p-6">
                   <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
@@ -1044,6 +1045,7 @@ function Index() {
                 </section>
 
             </div>
+            ) : null}
             {officeEntered ? (
             <>
             <div className="no-print space-y-4 border-b border-border pb-5">
