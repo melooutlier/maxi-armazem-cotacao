@@ -16,6 +16,7 @@ import {
   MapPin,
   Minus,
   Package,
+  Pencil,
   Plus,
   Search,
   Store,
@@ -98,6 +99,10 @@ function Index() {
   const [historyStatus, setHistoryStatus] = useState<"all" | "pending" | "completed">("all");
   const [companyName, setCompanyName] = useState("");
   const [cadastroSection, setCadastroSection] = useState(false);
+  const [editingCompanyId, setEditingCompanyId] = useState<string | null>(null);
+  const [editingCompanyName, setEditingCompanyName] = useState("");
+  const [editingCompanyActive, setEditingCompanyActive] = useState(true);
+  const [companyToDelete, setCompanyToDelete] = useState<{ id: string; name: string } | null>(null);
   const [officeCompany, setOfficeCompany] = useState("");
   const [officeEntered, setOfficeEntered] = useState(false);
   const [dateFrom, setDateFrom] = useState("");
@@ -160,6 +165,38 @@ function Index() {
       toast.success("Empresa cadastrada com sucesso.");
     },
     onError: (error) => toast.error(error.message.includes("companies_name_key") ? "Já existe uma empresa com esse nome." : `Não foi possível cadastrar a empresa: ${error.message}`),
+  });
+
+  const updateCompanyMutation = useMutation({
+    mutationFn: async ({ id, name, active }: { id: string; name: string; active: boolean }) => {
+      const { data: company, error } = await supabase.from("companies").update({ name, active }).eq("id", id).select().single();
+      if (error) throw error;
+      return company;
+    },
+    onSuccess: (company) => {
+      queryClient.setQueryData(fieldVisitQueryOptions.queryKey, (current: typeof data | undefined) =>
+        current ? { ...current, companies: current.companies.map((entry) => entry.id === company.id ? company : entry).sort((a, b) => a.name.localeCompare(b.name, "pt-MZ")) } : current,
+      );
+      setEditingCompanyId(null);
+      toast.success("Empresa actualizada com sucesso.");
+    },
+    onError: (error) => toast.error(error.message.includes("companies_name_key") ? "Já existe uma empresa com esse nome." : `Não foi possível actualizar a empresa: ${error.message}`),
+  });
+
+  const deleteCompanyMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("companies").delete().eq("id", id);
+      if (error) throw error;
+      return id;
+    },
+    onSuccess: (id) => {
+      queryClient.setQueryData(fieldVisitQueryOptions.queryKey, (current: typeof data | undefined) =>
+        current ? { ...current, companies: current.companies.filter((company) => company.id !== id) } : current,
+      );
+      setCompanyToDelete(null);
+      toast.success("Empresa eliminada com sucesso.");
+    },
+    onError: (error) => toast.error(`Não foi possível eliminar a empresa: ${error.message}`),
   });
 
   const discountMutation = useMutation({
@@ -337,7 +374,8 @@ function Index() {
     ).slice(0, 6);
   }, [searchText, selectedProduct]);
 
-  const companies = data.companies.map((company) => company.name);
+  const activeCompanies = data.companies.filter((company) => company.active);
+  const companies = activeCompanies.map((company) => company.name);
   const officeVisits = data.visits.filter((visit) => visit.status !== "in_progress" && (!officeEntered || visit.supermarket === officeCompany));
   const officeVisit =
     officeVisits.find((visit) => visit.id === officeVisitId) ?? officeVisits[0] ?? null;
@@ -1053,41 +1091,45 @@ function Index() {
 
         {mode === "cadastro" ? (
           <section className="mx-auto max-w-4xl space-y-6">
-            <div className="rounded-xl border border-border bg-card p-5 shadow-sm sm:p-7">
-              <div className="flex items-center gap-3">
-                <span className="grid size-12 place-items-center rounded-xl bg-brand-green/15 text-brand-navy">
-                  <Building2 className="size-6" aria-hidden="true" />
-                </span>
-                <div>
-                  <h2 className="font-display text-xl font-semibold">Cadastrar nova empresa</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">As empresas cadastradas ficam disponíveis na selecção antes de iniciar uma vistoria.</p>
+            {!cadastroSection ? (
+              <button type="button" onClick={() => setCadastroSection(true)} className="flex w-full items-center gap-4 rounded-xl border border-border bg-card p-6 text-left shadow-sm transition hover:border-brand-green hover:shadow-md">
+                <span className="grid size-14 place-items-center rounded-xl bg-brand-green/15 text-brand-navy"><Building2 className="size-7" aria-hidden="true" /></span>
+                <span className="min-w-0 flex-1"><span className="block font-display text-xl font-semibold">Cadastro de empresas</span><span className="mt-1 block text-sm text-muted-foreground">Registar, editar, activar, desactivar ou eliminar empresas.</span></span>
+                <ArrowRight className="size-5 shrink-0" aria-hidden="true" />
+              </button>
+            ) : (
+              <>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div><h2 className="font-display text-2xl font-semibold">Cadastro de empresas</h2><p className="mt-1 text-sm text-muted-foreground">Gira os nomes e o estado das empresas registadas.</p></div>
+                  <Button type="button" variant="outline" onClick={() => { setCadastroSection(false); setEditingCompanyId(null); }}>Voltar</Button>
                 </div>
-              </div>
-              <form className="mt-6 flex flex-col gap-3 sm:flex-row" onSubmit={(event) => { event.preventDefault(); const name = companyName.trim(); if (!name) return; createCompanyMutation.mutate(name); }}>
-                <Input value={companyName} onChange={(event) => setCompanyName(event.target.value)} placeholder="Nome da empresa" aria-label="Nome da empresa" className="h-12 bg-background" maxLength={120} />
-                <Button type="submit" disabled={!companyName.trim() || createCompanyMutation.isPending} className="h-12 shrink-0 bg-brand-green text-brand-green-foreground hover:bg-brand-green/90">
-                  <Plus aria-hidden="true" />{createCompanyMutation.isPending ? "A cadastrar…" : "Cadastrar empresa"}
-                </Button>
-              </form>
-            </div>
-            <div className="rounded-xl border border-border bg-card p-5 shadow-sm sm:p-7">
-              <div className="flex items-center justify-between gap-3 border-b border-border pb-4">
-                <div>
-                  <h2 className="font-display text-xl font-semibold">Empresas cadastradas</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">Empresas disponíveis para novas vistorias.</p>
+                <div className="rounded-xl border border-border bg-card p-5 shadow-sm sm:p-7">
+                  <div className="flex items-center gap-3"><span className="grid size-12 place-items-center rounded-xl bg-brand-green/15 text-brand-navy"><Building2 className="size-6" aria-hidden="true" /></span><div><h3 className="font-display text-xl font-semibold">Cadastrar nova empresa</h3><p className="mt-1 text-sm text-muted-foreground">As empresas activas ficam disponíveis para novas vistorias.</p></div></div>
+                  <form className="mt-6 flex flex-col gap-3 sm:flex-row" onSubmit={(event) => { event.preventDefault(); const name = companyName.trim(); if (name) createCompanyMutation.mutate(name); }}>
+                    <Input value={companyName} onChange={(event) => setCompanyName(event.target.value)} placeholder="Nome da empresa" aria-label="Nome da empresa" className="h-12 bg-background" maxLength={120} />
+                    <Button type="submit" disabled={!companyName.trim() || createCompanyMutation.isPending} className="h-12 shrink-0 bg-brand-green text-brand-green-foreground hover:bg-brand-green/90"><Plus aria-hidden="true" />{createCompanyMutation.isPending ? "A cadastrar…" : "Cadastrar empresa"}</Button>
+                  </form>
                 </div>
-                <Badge variant="secondary">{data.companies.length}</Badge>
-              </div>
-              <div className="divide-y divide-border">
-                {data.companies.length ? data.companies.map((company) => (
-                  <div key={company.id} className="flex items-center gap-3 py-4">
-                    <span className="grid size-10 place-items-center rounded-lg bg-muted text-brand-navy"><Store className="size-5" aria-hidden="true" /></span>
-                    <span className="min-w-0 flex-1 truncate text-sm font-medium">{company.name}</span>
-                    <Badge variant="outline">Activa</Badge>
+                <div className="rounded-xl border border-border bg-card p-5 shadow-sm sm:p-7">
+                  <div className="flex items-center justify-between gap-3 border-b border-border pb-4"><div><h3 className="font-display text-xl font-semibold">Empresas registadas</h3><p className="mt-1 text-sm text-muted-foreground">Edite os dados ou altere a disponibilidade de cada empresa.</p></div><Badge variant="secondary">{data.companies.length}</Badge></div>
+                  <div className="divide-y divide-border">
+                    {data.companies.length ? data.companies.map((company) => (
+                      <div key={company.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center">
+                        {editingCompanyId === company.id ? (
+                          <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-[minmax(0,1fr)_170px_auto]">
+                            <Input value={editingCompanyName} onChange={(event) => setEditingCompanyName(event.target.value)} aria-label="Nome da empresa" maxLength={120} />
+                            <Select value={editingCompanyActive ? "active" : "inactive"} onValueChange={(value) => setEditingCompanyActive(value === "active")}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">Activa</SelectItem><SelectItem value="inactive">Não activa</SelectItem></SelectContent></Select>
+                            <div className="flex gap-2"><Button type="button" size="sm" disabled={!editingCompanyName.trim() || updateCompanyMutation.isPending} onClick={() => updateCompanyMutation.mutate({ id: company.id, name: editingCompanyName.trim(), active: editingCompanyActive })}>Guardar</Button><Button type="button" size="sm" variant="outline" onClick={() => setEditingCompanyId(null)}>Cancelar</Button></div>
+                          </div>
+                        ) : (
+                          <><span className="grid size-10 shrink-0 place-items-center rounded-lg bg-muted text-brand-navy"><Store className="size-5" aria-hidden="true" /></span><span className="min-w-0 flex-1 truncate text-sm font-medium">{company.name}</span><Badge variant={company.active ? "default" : "secondary"}>{company.active ? "Activa" : "Não activa"}</Badge><div className="flex gap-2"><Button type="button" size="sm" variant="outline" onClick={() => { setEditingCompanyId(company.id); setEditingCompanyName(company.name); setEditingCompanyActive(company.active); }}><Pencil className="size-4" aria-hidden="true" />Editar</Button><Button type="button" size="sm" variant="destructive" onClick={() => setCompanyToDelete({ id: company.id, name: company.name })}><Trash2 className="size-4" aria-hidden="true" />Eliminar</Button></div></>
+                        )}
+                      </div>
+                    )) : <p className="py-8 text-center text-sm text-muted-foreground">Ainda não existem empresas cadastradas.</p>}
                   </div>
-                )) : <p className="py-8 text-center text-sm text-muted-foreground">Ainda não existem empresas cadastradas.</p>}
-              </div>
-            </div>
+                </div>
+              </>
+            )}
           </section>
         ) : null}
 
@@ -1227,6 +1269,19 @@ function Index() {
           <span>Catálogo de demonstração · {PRODUCT_CATALOG.length} produtos</span>
         </footer>}
       </div>
+
+      {companyToDelete ? (
+        <div className="no-print fixed inset-0 z-[70] grid place-items-center bg-black/60 p-4" role="alertdialog" aria-modal="true" aria-labelledby="delete-company-title">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl">
+            <h2 id="delete-company-title" className="font-display text-xl font-semibold">Eliminar empresa?</h2>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">Tem a certeza de que pretende eliminar <strong className="text-foreground">{companyToDelete.name}</strong>? Esta acção não pode ser desfeita.</p>
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              <Button type="button" variant="outline" onClick={() => setCompanyToDelete(null)}>Cancelar</Button>
+              <Button type="button" variant="destructive" disabled={deleteCompanyMutation.isPending} onClick={() => deleteCompanyMutation.mutate(companyToDelete.id)}>{deleteCompanyMutation.isPending ? "A eliminar…" : "Sim, eliminar"}</Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {stockWarningProduct ? (
         <div className="no-print fixed inset-0 z-[60] grid place-items-center bg-black/60 p-4" role="alertdialog" aria-modal="true" aria-labelledby="stock-warning-title">
