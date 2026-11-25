@@ -211,6 +211,7 @@ function Index() {
       setSearchText("");
       setSelectedProduct(null);
       setQuantityText("1");
+      setPriority(null);
       toast.success("Produto adicionado à vistoria.");
     },
     onError: (error) => toast.error(`Não foi possível adicionar o produto: ${error.message}`),
@@ -625,7 +626,12 @@ function Index() {
                             <span className="block truncate text-sm font-semibold">{product.name}</span>
                             <span className="mt-0.5 block text-xs text-muted-foreground">{product.code} · {product.category}</span>
                           </span>
-                          <span className="shrink-0 text-xs text-muted-foreground">{product.unit}</span>
+                          <span className="shrink-0 text-right">
+                            <span className="block text-sm font-semibold tabular-nums">{product.stock} un.</span>
+                            <span className={`block text-[10px] font-semibold uppercase ${getStockLevel(product.stock) === "very-low" ? "text-red-600" : getStockLevel(product.stock) === "low" ? "text-amber-600" : "text-green-600"}`}>
+                              {getStockLevel(product.stock) === "very-low" ? "Muito baixo" : getStockLevel(product.stock) === "low" ? "Baixo" : "Bom"}
+                            </span>
+                          </span>
                         </button>
                       ))}
                     </div>
@@ -637,6 +643,7 @@ function Index() {
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold">{selectedProduct.name}</p>
                       <p className="text-xs text-muted-foreground">{selectedProduct.code} · {selectedProduct.category}</p>
+                      <p className="mt-1 text-xs font-semibold">Stock disponível: {selectedProduct.stock} unidades</p>
                       <p className="mt-1 text-xs font-semibold">Stock disponível: {selectedProduct.stock} unidades</p>
                     </div>
                     <Badge variant="outline" className={getStockLevel(selectedProduct.stock) === "very-low" ? "border-red-200 bg-red-50 text-red-700" : getStockLevel(selectedProduct.stock) === "low" ? "border-amber-200 bg-amber-50 text-amber-700" : "border-green-200 bg-green-50 text-green-700"}>
