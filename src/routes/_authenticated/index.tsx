@@ -96,7 +96,7 @@ function Index() {
   const { data } = useSuspenseQuery(fieldVisitQueryOptions);
   const [mode, setMode] = useState<ViewMode>("menu");
   const [selectedStore, setSelectedStore] = useState<string>("VIP Spar Sommerschield");
-  const [operatorName, setOperatorName] = useState("");
+  const [operatorName, setOperatorName] = useState("Utilizador autenticado");
   const [selectedVisitId, setSelectedVisitId] = useState<string | null>(null);
   const [officeVisitId, setOfficeVisitId] = useState("");
   const [historyStore, setHistoryStore] = useState("all");
@@ -110,8 +110,25 @@ function Index() {
 
   useEffect(() => {
     setClock(new Date());
+    let mounted = true;
+    void supabase.auth.getUser().then(({ data: authData }) => {
+      if (!mounted) return;
+      const user = authData.user;
+      const metadataName =
+        user?.user_metadata?.full_name ??
+        user?.user_metadata?.name ??
+        user?.user_metadata?.display_name;
+      setOperatorName(
+        typeof metadataName === "string" && metadataName.trim()
+          ? metadataName.trim()
+          : user?.email ?? "Utilizador autenticado",
+      );
+    });
     const timer = window.setInterval(() => setClock(new Date()), 60_000);
-    return () => window.clearInterval(timer);
+    return () => {
+      mounted = false;
+      window.clearInterval(timer);
+    };
   }, []);
 
   const refreshVisits = () =>
@@ -408,25 +425,17 @@ function Index() {
             </div>
           </div>
 
-          {mode !== "menu" ? <nav aria-label="Modos de trabalho" className="flex w-full gap-1 overflow-x-auto rounded-md bg-brand-navy-foreground/10 p-1 lg:w-auto">
-            {MODES.map(({ id, label, icon: Icon }) => (
-              <Button
-                key={id}
-                type="button"
-                variant="ghost"
-                aria-pressed={mode === id}
-                onClick={() => setMode(id)}
-                className={`h-10 shrink-0 px-4 text-sm ${
-                  mode === id
-                    ? "bg-brand-navy-foreground text-brand-navy shadow-sm hover:bg-brand-navy-foreground/90 hover:text-brand-navy"
-                    : "text-brand-navy-foreground/80 hover:bg-brand-navy-foreground/10 hover:text-brand-navy-foreground"
-                }`}
-              >
-                <Icon aria-hidden="true" />
-                {label}
-              </Button>
-            ))}
-          </nav> : null}
+          {mode !== "menu" ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setMode("menu")}
+              className="border-brand-navy-foreground/30 bg-brand-navy-foreground/10 text-brand-navy-foreground hover:bg-brand-navy-foreground/20"
+            >
+              <ArrowRight className="rotate-180" aria-hidden="true" />
+              Menu inicial
+            </Button>
+          ) : null}
 
           <div className="hidden items-center gap-3 lg:flex">
             <div className="text-right">
@@ -505,7 +514,7 @@ function Index() {
         ) : null}
 
         {mode === "field" ? (
-          <section className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.08fr)_minmax(400px,0.92fr)] xl:gap-8">
+          <section className="space-y-6">
             <div className="min-w-0 rounded-md border border-border bg-card p-4 shadow-sm sm:p-6">
               <div className="mb-5 flex items-start justify-between gap-3">
                 <div>
@@ -519,7 +528,7 @@ function Index() {
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="grid gap-2 text-sm font-medium">
-                  Supermercado
+                  Empresa
                   <Select value={selectedStore} onValueChange={setSelectedStore} disabled={Boolean(activeVisit)}>
                     <SelectTrigger className="h-12 bg-background text-left">
                       <SelectValue placeholder="Escolha a loja" />
@@ -533,18 +542,7 @@ function Index() {
                     </SelectContent>
                   </Select>
                 </label>
-                <label className="grid gap-2 text-sm font-medium">
-                  Gestor responsável
-                  <Input
-                    value={operatorName}
-                    onChange={(event) => setOperatorName(event.target.value)}
-                    placeholder="Nome do gestor"
-                    autoComplete="name"
-                    className="h-12 bg-background"
-                    disabled={Boolean(activeVisit)}
-                  />
-                </label>
-              </div>
+               </div>
 
               <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -562,7 +560,7 @@ function Index() {
                 <Button
                   type="button"
                   variant={activeVisit ? "secondary" : "default"}
-                  disabled={Boolean(activeVisit) || startVisitMutation.isPending || !operatorName.trim()}
+                  disabled={Boolean(activeVisit) || startVisitMutation.isPending}
                   onClick={handleStartVisit}
                   className="h-11 w-full sm:w-auto"
                 >
@@ -704,7 +702,7 @@ function Index() {
                   {addItemMutation.isPending ? "A adicionar…" : "Adicionar à lista"}
                 </Button>
                 {!activeVisit ? (
-                  <p className="mt-3 text-center text-xs text-muted-foreground">Preencha o gestor responsável e inicie a vistoria para registar produtos.</p>
+                  <p className="mt-3 text-center text-xs text-muted-foreground">Seleccione a empresa e inicie a vistoria para registar produtos.</p>
                 ) : null}
               </div>
             </div>
