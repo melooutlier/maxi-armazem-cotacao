@@ -128,7 +128,7 @@ function Index() {
       setOperatorName(
         typeof metadataName === "string" && metadataName.trim()
           ? metadataName.trim()
-          : user?.email ?? "Utilizador autenticado",
+          : "Utilizador autenticado",
       );
     });
     const timer = window.setInterval(() => setClock(new Date()), 60_000);
