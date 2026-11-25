@@ -104,7 +104,6 @@ function Index() {
   const [searchText, setSearchText] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<CatalogProduct | null>(null);
   const [quantityText, setQuantityText] = useState("1");
-  const [priority, setPriority] = useState<Priority | null>(null);
   const [companyName, setCompanyName] = useState("");
   const [clock, setClock] = useState<Date | null>(null);
 
@@ -722,7 +721,7 @@ function Index() {
                           <span className="shrink-0 text-right">
                             <span className="block text-sm font-semibold tabular-nums">{product.stock} un.</span>
                             <span className={`block text-[10px] font-semibold uppercase ${getStockLevel(product.stock) === "very-low" ? "text-red-600" : getStockLevel(product.stock) === "low" ? "text-amber-600" : "text-green-600"}`}>
-                              {getStockLevel(product.stock) === "very-low" ? "Muito baixo" : getStockLevel(product.stock) === "low" ? "Baixo" : "Bom"}
+                              {getStockLevel(product.stock) === "very-low" ? "Muito baixo" : getStockLevel(product.stock) === "low" ? "Baixo" : "Normal"}
                             </span>
                           </span>
                         </button>
@@ -739,7 +738,7 @@ function Index() {
                       <p className="mt-1 text-xs font-semibold">Stock disponível: {selectedProduct.stock} unidades</p>
                     </div>
                     <Badge variant="outline" className={getStockLevel(selectedProduct.stock) === "very-low" ? "border-red-200 bg-red-50 text-red-700" : getStockLevel(selectedProduct.stock) === "low" ? "border-amber-200 bg-amber-50 text-amber-700" : "border-green-200 bg-green-50 text-green-700"}>
-                      {getStockLevel(selectedProduct.stock) === "very-low" ? "Stock muito baixo" : getStockLevel(selectedProduct.stock) === "low" ? "Stock baixo" : "Stock bom"}
+                      {getStockLevel(selectedProduct.stock) === "very-low" ? "Stock muito baixo" : getStockLevel(selectedProduct.stock) === "low" ? "Stock baixo" : "Stock normal"}
                     </Badge>
                   </div>
                 ) : null}
