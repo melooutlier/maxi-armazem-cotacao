@@ -104,6 +104,7 @@ function Index() {
   const [companyToDelete, setCompanyToDelete] = useState<{ id: string; name: string } | null>(null);
   const [officeCompany, setOfficeCompany] = useState("");
   const [officeEntered, setOfficeEntered] = useState(false);
+  const [showCompletedVisits, setShowCompletedVisits] = useState(false);
   const [officeDateFrom, setOfficeDateFrom] = useState("");
   const [officeDateTo, setOfficeDateTo] = useState("");
   const [dateFrom, setDateFrom] = useState("");
@@ -380,7 +381,6 @@ function Index() {
   const officeVisits = data.visits.filter((visit) => {
     const visitDay = localDateValue(visit.started_at);
     return visit.status !== "in_progress" &&
-      (!officeEntered || visit.supermarket === officeCompany) &&
       (!officeDateFrom || visitDay >= officeDateFrom) &&
       (!officeDateTo || visitDay <= officeDateTo);
   });
@@ -397,7 +397,6 @@ function Index() {
   const fieldPendingVisits = data.visits.filter((visit) => visit.status === "completed" && !isVisitFullyLaunched(visit));
   const fieldCompletedVisits = data.visits.filter((visit) => visit.status !== "in_progress" && isVisitFullyLaunched(visit));
   const openVisitInOffice = (visit: Visit) => {
-    setOfficeCompany(visit.supermarket);
     setOfficeEntered(true);
     setOfficeDateFrom("");
     setOfficeDateTo("");
@@ -649,8 +648,8 @@ function Index() {
                   }
                   if (id === "office") {
                     setOfficeEntered(false);
-                    setOfficeCompany("");
                     setOfficeVisitId("");
+                    setShowCompletedVisits(false);
                   }
                 }}
                 className="group flex min-h-56 flex-col items-start justify-between rounded-xl border border-border bg-card p-7 text-left shadow-sm transition hover:-translate-y-1 hover:border-brand-green hover:shadow-md"
@@ -1012,15 +1011,15 @@ function Index() {
                 </section>
 
                 <section className="rounded-xl border border-border bg-card p-4 shadow-sm sm:p-6">
-                  <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                  <button type="button" aria-expanded={showCompletedVisits} onClick={() => setShowCompletedVisits((visible) => !visible)} className="mb-4 flex w-full flex-wrap items-center justify-between gap-2 text-left">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wider text-success">Lançamento concluído</p>
                       <h2 className="mt-1 font-display text-xl font-semibold">Vistorias concluídas</h2>
                       <p className="mt-1 text-sm text-muted-foreground">Vistorias já lançadas no sistema.</p>
                     </div>
-                    <Badge variant="secondary">{fieldCompletedVisits.length} concluídas</Badge>
-                  </div>
-                  {fieldCompletedVisits.length ? (
+                    <span className="flex items-center gap-2"><Badge variant="secondary">{fieldCompletedVisits.length} concluídas</Badge><span className="text-sm font-medium text-muted-foreground">{showCompletedVisits ? "Ocultar" : "Mostrar"}</span><ArrowRight className={`size-4 transition-transform ${showCompletedVisits ? "rotate-90" : ""}`} aria-hidden="true" /></span>
+                  </button>
+                  {showCompletedVisits ? (
                     <div className="divide-y divide-border">
                       {fieldCompletedVisits.map((visit) => {
                         const items = data.items.filter((item) => item.visit_id === visit.id);
@@ -1049,43 +1048,15 @@ function Index() {
                 </section>
 
             </div>
-            {!officeEntered ? (
-              <div className="space-y-5">
-                <div>
-                  <h2 className="font-display text-xl font-semibold">Empresas</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">Seleccione uma empresa para consultar as vistorias disponíveis para lançamento.</p>
-                </div>
-                {activeCompanies.length === 0 ? (
-                  <div className="rounded-md border border-dashed border-border bg-card p-8 text-center text-sm text-muted-foreground">Ainda não existem empresas cadastradas.</div>
-                ) : (
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {activeCompanies.map((company) => (
-                      <button key={company.id} type="button" onClick={() => {
-                        setOfficeCompany(company.name);
-                        setOfficeEntered(true);
-                        setOfficeVisitId("");
-                        setOfficeDateFrom("");
-                        setOfficeDateTo("");
-                      }} className="flex min-h-28 items-center justify-between rounded-xl border border-border bg-card p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-brand-green hover:shadow-md">
-                        <span className="flex min-w-0 items-center gap-3">
-                          <span className="grid size-11 shrink-0 place-items-center rounded-lg bg-brand-green/15 text-brand-navy"><Store className="size-5" /></span>
-                          <span className="truncate font-semibold">{company.name}</span>
-                        </span>
-                        <ArrowRight className="size-5 shrink-0 text-muted-foreground" />
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ) : (
+            {officeEntered ? (
             <>
             <div className="no-print space-y-4 border-b border-border pb-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs font-semibold uppercase text-muted-foreground">Empresa seleccionada</p>
-                  <h2 className="font-display text-xl font-semibold">{officeCompany}</h2>
+                  <p className="text-xs font-semibold uppercase text-muted-foreground">Vistoria seleccionada</p>
+                  <h2 className="font-display text-xl font-semibold">{officeVisit?.supermarket ?? "Detalhes da vistoria"}</h2>
                 </div>
-                <Button type="button" variant="outline" onClick={() => { setOfficeEntered(false); setOfficeVisitId(""); }}>Voltar à lista de empresas</Button>
+                <Button type="button" variant="outline" onClick={() => { setOfficeEntered(false); setOfficeVisitId(""); }}>Voltar à visão geral</Button>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="grid gap-2 text-sm font-medium">Data inicial
@@ -1336,7 +1307,6 @@ function Index() {
                         className="justify-self-start sm:justify-self-end"
                         onClick={() => {
                           setOfficeVisitId(visit.id);
-                          setOfficeCompany(visit.supermarket);
                           setOfficeEntered(true);
                           setMode("office");
                         }}
