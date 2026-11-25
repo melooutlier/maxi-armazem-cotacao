@@ -109,7 +109,6 @@ export type Database = {
           created_at: string
           discount_percent: number
           id: string
-          is_priority: boolean
           operator_name: string
           started_at: string
           status: string
@@ -122,7 +121,6 @@ export type Database = {
           created_at?: string
           discount_percent?: number
           id?: string
-          is_priority?: boolean
           operator_name: string
           started_at?: string
           status?: string
@@ -135,7 +133,6 @@ export type Database = {
           created_at?: string
           discount_percent?: number
           id?: string
-          is_priority?: boolean
           operator_name?: string
           started_at?: string
           status?: string
