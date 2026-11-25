@@ -95,6 +95,8 @@ function Index() {
   const queryClient = useQueryClient();
   const { data } = useSuspenseQuery(fieldVisitQueryOptions);
   const [mode, setMode] = useState<ViewMode>("menu");
+  const [fieldStarted, setFieldStarted] = useState(false);
+  const [completionChoiceOpen, setCompletionChoiceOpen] = useState(false);
   const [selectedStore, setSelectedStore] = useState<string>("VIP Spar Sommerschield");
   const [operatorName, setOperatorName] = useState("Utilizador autenticado");
   const [selectedVisitId, setSelectedVisitId] = useState<string | null>(null);
@@ -157,6 +159,7 @@ function Index() {
     },
     onSuccess: async (visit) => {
       setSelectedVisitId(visit.id);
+      setFieldStarted(true);
       await refreshVisits();
       toast.success("Vistoria iniciada.");
     },
@@ -235,7 +238,7 @@ function Index() {
       setSelectedVisitId(null);
       setOfficeVisitId(visit.id);
       await refreshVisits();
-      setMode("menu");
+      setCompletionChoiceOpen(true);
       toast.success(`Vistoria ${visit.visit_code ?? "concluída"} concluída.`);
     },
     onError: (error) => toast.error(`Não foi possível concluir a vistoria: ${error.message}`),
@@ -473,7 +476,7 @@ function Index() {
               {mode === "menu"
                 ? "Escolha a área em que pretende trabalhar."
                 : mode === "field"
-                  ? "Registe as faltas da loja com rapidez e siga para a próxima secção."
+                  ? (fieldStarted || activeVisit ? "Pesquise os produtos no catálogo e registe as faltas da empresa." : "Escolha a empresa para iniciar uma nova vistoria.")
                   : mode === "office"
                     ? "Transfira os pedidos para o sistema central e acompanhe cada lançamento."
                     : "Acompanhe o ritmo das vistorias e as reposições pendentes."}
@@ -493,7 +496,7 @@ function Index() {
               <button
                 key={id}
                 type="button"
-                onClick={() => setMode(id)}
+                onClick={() => { setMode(id); if (id === "field") setFieldStarted(false); }}
                 className="group flex min-h-56 flex-col items-start justify-between rounded-xl border border-border bg-card p-7 text-left shadow-sm transition hover:-translate-y-1 hover:border-brand-green hover:shadow-md"
               >
                 <span className="grid size-14 place-items-center rounded-xl bg-brand-green/15 text-brand-navy">
@@ -515,61 +518,54 @@ function Index() {
 
         {mode === "field" ? (
           <section className="space-y-6">
-            <div className="min-w-0 rounded-md border border-border bg-card p-4 shadow-sm sm:p-6">
-              <div className="mb-5 flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs font-semibold uppercase text-muted-foreground">01 · Preparar visita</p>
-                  <h2 className="mt-1 font-display text-xl font-semibold">Dados da vistoria</h2>
+            {!fieldStarted && !activeVisit ? (
+              <section className="grid min-h-[52vh] place-items-center py-8">
+                <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-6 shadow-lg sm:p-8">
+                  <div className="mx-auto mb-5 grid size-14 place-items-center rounded-2xl bg-brand-green/15 text-brand-navy">
+                    <Store className="size-7" aria-hidden="true" />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-success">Vistoria de campo</p>
+                    <h2 className="mt-2 font-display text-2xl font-semibold">Escolher empresa</h2>
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">Seleccione a empresa onde pretende realizar a vistoria. Depois de iniciar, poderá pesquisar produtos e registar as faltas.</p>
+                  </div>
+                  <label className="mt-7 grid gap-2 text-sm font-medium">
+                    Empresa
+                    <Select value={selectedStore} onValueChange={setSelectedStore}>
+                      <SelectTrigger className="h-12 bg-background text-left">
+                        <SelectValue placeholder="Escolha a empresa" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SUPERMARKETS.map((store) => (
+                          <SelectItem key={store} value={store}>{store}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </label>
+                  <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
+                    <CalendarDays className="size-4" aria-hidden="true" />
+                    {clock
+                      ? new Intl.DateTimeFormat("pt-MZ", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(clock)
+                      : "Data e hora automáticas"}
+                  </div>
+                  <Button
+                    type="button"
+                    size="lg"
+                    disabled={!selectedStore || startVisitMutation.isPending}
+                    onClick={handleStartVisit}
+                    className="mt-7 h-12 w-full bg-brand-green text-brand-green-foreground hover:bg-brand-green/90"
+                  >
+                    {startVisitMutation.isPending ? "A iniciar vistoria…" : "Iniciar vistoria"}
+                    <ArrowRight aria-hidden="true" />
+                  </Button>
                 </div>
-                <span className="grid size-10 place-items-center rounded-md bg-accent text-accent-foreground">
-                  <Store className="size-5" aria-hidden="true" />
-                </span>
-              </div>
+              </section>
+            ) : null}
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className="grid gap-2 text-sm font-medium">
-                  Empresa
-                  <Select value={selectedStore} onValueChange={setSelectedStore} disabled={Boolean(activeVisit)}>
-                    <SelectTrigger className="h-12 bg-background text-left">
-                      <SelectValue placeholder="Escolha a loja" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {SUPERMARKETS.map((store) => (
-                        <SelectItem key={store} value={store}>
-                          {store}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </label>
-               </div>
-
-              <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <CalendarDays className="size-4" aria-hidden="true" />
-                  {clock
-                    ? new Intl.DateTimeFormat("pt-MZ", {
-                        day: "2-digit",
-                        month: "long",
-                        year: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      }).format(clock)
-                    : "Data e hora automáticas"}
-                </div>
-                <Button
-                  type="button"
-                  variant={activeVisit ? "secondary" : "default"}
-                  disabled={Boolean(activeVisit) || startVisitMutation.isPending}
-                  onClick={handleStartVisit}
-                  className="h-11 w-full sm:w-auto"
-                >
-                  {activeVisit ? "Vistoria iniciada" : startVisitMutation.isPending ? "A iniciar…" : "Iniciar vistoria"}
-                  {!activeVisit && <ArrowRight aria-hidden="true" />}
-                </Button>
-              </div>
-
-              <div className="mt-7 border-t border-border pt-6">
+            {fieldStarted || activeVisit ? (
+              <section className="space-y-6">
+                <div className="min-w-0 rounded-md border border-border bg-card p-4 shadow-sm sm:p-6">
+              <div className="mb-3 flex items-center justify-between gap-3">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <div>
                     <p className="text-xs font-semibold uppercase text-muted-foreground">02 · Encontrar produto</p>
@@ -791,7 +787,7 @@ function Index() {
                       <ClipboardCheck className="size-6" aria-hidden="true" />
                     </span>
                     <p className="mt-3 text-sm font-medium">Pronto para uma nova vistoria</p>
-                    <p className="mt-1 max-w-xs text-xs leading-5 text-muted-foreground">Selecione a loja, identifique o gestor e comece a registar os produtos em falta.</p>
+                    <p className="mt-1 max-w-xs text-xs leading-5 text-muted-foreground">Seleccione a empresa e inicie a vistoria para começar a registar os produtos em falta.</p>
                   </div>
                 </div>
               )}
@@ -806,7 +802,7 @@ function Index() {
                   disabled={!activeVisit || !canCompleteVisit(activeItems.length) || completeVisitMutation.isPending}
                   onClick={() => {
                     if (!activeVisit) return;
-                    const confirmed = window.confirm("Tem a certeza de que pretende concluir esta vistoria? Depois de confirmar, voltará ao menu principal.");
+                    const confirmed = window.confirm("Tem a certeza de que pretende finalizar esta vistoria?");
                     if (confirmed) completeVisitMutation.mutate(activeVisit.id);
                   }}
                   className="h-12 w-full bg-brand-navy text-brand-navy-foreground hover:bg-brand-navy/90"
@@ -816,6 +812,7 @@ function Index() {
                 </Button>
               </div>
             </div>
+              ) : null}
           </section>
         ) : null}
 
@@ -1050,7 +1047,28 @@ function Index() {
           </section>
         ) : null}
 
-        <footer className="no-print mt-10 flex flex-col gap-2 border-t border-border pt-4 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+        {completionChoiceOpen ? (
+        <div className="no-print fixed inset-0 z-50 grid place-items-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="completion-choice-title">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl sm:p-8">
+            <span className="mx-auto grid size-14 place-items-center rounded-full bg-success/10 text-success">
+              <CheckCircle2 className="size-7" aria-hidden="true" />
+            </span>
+            <h2 id="completion-choice-title" className="mt-4 text-center font-display text-2xl font-semibold">Vistoria finalizada</h2>
+            <p className="mt-2 text-center text-sm leading-6 text-muted-foreground">A vistoria foi guardada com sucesso. O que pretende fazer agora?</p>
+            <div className="mt-7 grid gap-3 sm:grid-cols-2">
+              <Button type="button" variant="outline" className="h-12" onClick={() => { setCompletionChoiceOpen(false); setFieldStarted(false); setMode("menu"); }}>
+                Voltar ao menu principal
+              </Button>
+              <Button type="button" className="h-12 bg-brand-green text-brand-green-foreground hover:bg-brand-green/90" onClick={() => { setCompletionChoiceOpen(false); setFieldStarted(false); setMode("office"); }}>
+                Ver relatório da vistoria
+                <ArrowRight aria-hidden="true" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <footer className="no-print mt-10 flex flex-col gap-2 border-t border-border pt-4 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <span className="inline-flex items-center gap-2"><MapPin className="size-3.5" aria-hidden="true" /> Operação Maxi Armazém · Maputo, Moçambique</span>
           <span>Catálogo de demonstração · {PRODUCT_CATALOG.length} produtos</span>
         </footer>
