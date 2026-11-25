@@ -8,6 +8,13 @@
       "when": 1795593187690,
       "tag": "0000_restore_visit_grants",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1795593852001,
+      "tag": "0001_staff_role_access",
+      "breakpoints": true
     }
   ]
 }
