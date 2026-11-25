@@ -59,7 +59,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 type ViewMode = "field" | "office" | "history";
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/_authenticated/")({
   loader: ({ context }) => context.queryClient.ensureQueryData(fieldVisitQueryOptions),
   head: () => ({
     meta: [
