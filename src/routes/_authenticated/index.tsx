@@ -117,9 +117,9 @@ function Index() {
       if (!mounted) return;
       const user = authData.user;
       const metadataName =
-        user?.user_metadata?.full_name ??
-        user?.user_metadata?.name ??
-        user?.user_metadata?.display_name;
+        user?.user_metadata?.["full_name"] ??
+        user?.user_metadata?.["name"] ??
+        user?.user_metadata?.["display_name"];
       setOperatorName(
         typeof metadataName === "string" && metadataName.trim()
           ? metadataName.trim()
