@@ -23,6 +23,7 @@ function AuthPage() {
   const navigate = useNavigate();
   const [mode, setMode] = useState<"in" | "up">("in");
   const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -35,7 +36,10 @@ function AuthPage() {
         : await supabase.auth.signUp({
             email,
             password,
-            options: { emailRedirectTo: window.location.origin },
+            options: {
+              data: { username: username.trim(), display_name: username.trim() },
+              emailRedirectTo: window.location.origin,
+            },
           });
     setBusy(false);
     if (error) {
@@ -56,6 +60,7 @@ function AuthPage() {
         <p className="text-sm text-muted-foreground">
           {mode === "in" ? "Entre para aceder às vistorias." : "Crie a sua conta da equipa."}
         </p>
+        {mode === "up" ? <Input type="text" placeholder="Nome de utilizador" value={username} onChange={(e) => setUsername(e.target.value)} required maxLength={40} /> : null}
         <Input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
         <Input type="password" placeholder="Palavra-passe" minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} required />
         <Button type="submit" className="w-full" disabled={busy}>
