@@ -5,6 +5,7 @@ import {
   Activity,
   ArrowRight,
   Boxes,
+  Building2,
   CalendarDays,
   Check,
   CheckCircle2,
@@ -35,22 +36,23 @@ import {
 } from "@/components/ui/select";
 import {
   BOX_STEP,
-  PRIORITIES,
   PRODUCT_CATALOG,
   QUANTITY_PRESETS,
   addQuantity,
   canCompleteVisit,
   fieldVisitQueryOptions,
   formatDateTime,
+  formatDuration,
+  getStockLevel,
   localDateValue,
   type CatalogProduct,
-  type Priority,
   type Visit,
   type VisitItem,
 } from "@/lib/field-visits";
 import { supabase } from "@/integrations/supabase/client";
 
 type ViewMode = "menu" | "field" | "office" | "history" | "cadastro";
+type ViewMode = "menu" | "field" | "office" | "history" | "companies";
 
 export const Route = createFileRoute("/_authenticated/")({
   loader: ({ context }) => context.queryClient.ensureQueryData(fieldVisitQueryOptions),
@@ -78,18 +80,18 @@ const MODES: { id: ViewMode; label: string; icon: typeof MapPin }[] = [
   { id: "office", label: "Escritório", icon: ClipboardList },
   { id: "history", label: "Histórico", icon: History },
   { id: "cadastro", label: "Cadastro", icon: ClipboardCheck },
+  { id: "companies", label: "Empresas", icon: Building2 },
 ];
-
-const priorityStyles: Record<Priority, string> = {
-  Urgente: "border-destructive/20 bg-destructive/10 text-destructive",
-  Normal: "border-border bg-secondary text-secondary-foreground",
-  Baixa: "border-success/20 bg-success/10 text-success",
-};
 
 function Index() {
   const queryClient = useQueryClient();
   const { data } = useSuspenseQuery(fieldVisitQueryOptions);
   const [mode, setMode] = useState<ViewMode>("menu");
+  const [fieldStarted, setFieldStarted] = useState(false);
+  const [completionChoiceOpen, setCompletionChoiceOpen] = useState(false);
+  const [completionConfirmOpen, setCompletionConfirmOpen] = useState(false);
+  const [stockWarningProduct, setStockWarningProduct] = useState<CatalogProduct | null>(null);
+  const [isPriority, setIsPriority] = useState<boolean | null>(null);
   const [selectedStore, setSelectedStore] = useState<string>("VIP Spar Sommerschield");
   const [operatorName, setOperatorName] = useState("Utilizador autenticado");
   const [selectedVisitId, setSelectedVisitId] = useState<string | null>(null);
@@ -105,7 +107,7 @@ function Index() {
   const [searchText, setSearchText] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<CatalogProduct | null>(null);
   const [quantityText, setQuantityText] = useState("1");
-  const [priority, setPriority] = useState<Priority>("Normal");
+  const [companyName, setCompanyName] = useState("");
   const [clock, setClock] = useState<Date | null>(null);
 
   useEffect(() => {
@@ -115,9 +117,10 @@ function Index() {
       if (!mounted) return;
       const user = authData.user;
       const metadataName =
-        user?.user_metadata?.full_name ??
-        user?.user_metadata?.name ??
-        user?.user_metadata?.display_name;
+        user?.user_metadata?.["username"] ??
+        user?.user_metadata?.["full_name"] ??
+        user?.user_metadata?.["name"] ??
+        user?.user_metadata?.["display_name"];
       setOperatorName(
         typeof metadataName === "string" && metadataName.trim()
           ? metadataName.trim()
@@ -145,11 +148,58 @@ function Index() {
     ? data.items.filter((item) => item.visit_id === activeVisit.id)
     : [];
 
+  const createCompanyMutation = useMutation({
+    mutationFn: async (name: string) => {
+      const { data: company, error } = await supabase.from("companies").insert({ name }).select().single();
+      if (error) throw error;
+      return company;
+    },
+    onSuccess: (company) => {
+      queryClient.setQueryData(fieldVisitQueryOptions.queryKey, (current: typeof data | undefined) =>
+        current ? { ...current, companies: [...current.companies, company].sort((a, b) => a.name.localeCompare(b.name, "pt-MZ")) } : current,
+      );
+      setSelectedStore(company.name);
+      setCompanyName("");
+      toast.success("Empresa cadastrada com sucesso.");
+    },
+    onError: (error) => toast.error(error.message.includes("companies_name_key") ? "Já existe uma empresa com esse nome." : `Não foi possível cadastrar a empresa: ${error.message}`),
+  });
+
+  const discountMutation = useMutation({
+    mutationFn: async ({ visitId, discount }: { visitId: string; discount: number }) => {
+      const { data: visit, error } = await supabase.from("visits").update({ discount_percent: discount }).eq("id", visitId).select().single();
+      if (error) throw error;
+      return visit;
+    },
+    onSuccess: (savedVisit) => {
+      queryClient.setQueryData(fieldVisitQueryOptions.queryKey, (current: typeof data | undefined) =>
+        current ? { ...current, visits: current.visits.map((visit) => visit.id === savedVisit.id ? savedVisit : visit) } : current,
+      );
+      toast.success("Desconto geral actualizado.");
+    },
+    onError: (error) => toast.error(`Não foi possível guardar o desconto geral: ${error.message}`),
+  });
+
+  const itemDiscountMutation = useMutation({
+    mutationFn: async ({ itemId, discount }: { itemId: string; discount: number }) => {
+      const { data: item, error } = await supabase.from("visit_items").update({ discount_percent: discount }).eq("id", itemId).select().single();
+      if (error) throw error;
+      return item;
+    },
+    onSuccess: (savedItem) => {
+      queryClient.setQueryData(fieldVisitQueryOptions.queryKey, (current: typeof data | undefined) =>
+        current ? { ...current, items: current.items.map((item) => item.id === savedItem.id ? savedItem : item) } : current,
+      );
+      toast.success("Desconto do produto actualizado.");
+    },
+    onError: (error) => toast.error(`Não foi possível guardar o desconto do produto: ${error.message}`),
+  });
+
   const startVisitMutation = useMutation({
-    mutationFn: async ({ supermarket, operator }: { supermarket: string; operator: string }) => {
+    mutationFn: async ({ supermarket, operator, isPriority: priorityFlag }: { supermarket: string; operator: string; isPriority: boolean }) => {
       const { data: visit, error } = await supabase
         .from("visits")
-        .insert({ supermarket, operator_name: operator, status: "in_progress" })
+        .insert({ supermarket, operator_name: operator, status: "in_progress", is_priority: priorityFlag })
         .select()
         .single();
       if (error) throw error;
@@ -157,6 +207,7 @@ function Index() {
     },
     onSuccess: async (visit) => {
       setSelectedVisitId(visit.id);
+      setFieldStarted(true);
       await refreshVisits();
       toast.success("Vistoria iniciada.");
     },
@@ -168,7 +219,6 @@ function Index() {
       visitId: string;
       product: CatalogProduct;
       quantity: number;
-      priority: Priority;
     }) => {
       const existing = data.items.find(
         (item) => item.visit_id === input.visitId && item.product_code === input.product.code,
@@ -176,8 +226,10 @@ function Index() {
       const result = existing
         ? await supabase
             .from("visit_items")
-            .update({ quantity: addQuantity(existing.quantity, input.quantity), priority: input.priority })
+            .update({ quantity: addQuantity(existing.quantity, input.quantity), priority: "" })
             .eq("id", existing.id)
+            .select()
+            .single()
         : await supabase.from("visit_items").insert({
             visit_id: input.visitId,
             product_code: input.product.code,
@@ -185,11 +237,23 @@ function Index() {
             category: input.product.category,
             unit: input.product.unit,
             quantity: input.quantity,
-            priority: input.priority,
-          });
+            priority: "",
+            discount_percent: 0,
+          }).select().single();
       if (result.error) throw result.error;
+      return result.data as VisitItem;
     },
-    onSuccess: async () => {
+    onSuccess: async (savedItem) => {
+      queryClient.setQueryData(fieldVisitQueryOptions.queryKey, (current: typeof data | undefined) => {
+        if (!current) return current;
+        const exists = current.items.some((item) => item.id === savedItem.id);
+        return {
+          ...current,
+          items: exists
+            ? current.items.map((item) => item.id === savedItem.id ? savedItem : item)
+            : [...current.items, savedItem],
+        };
+      });
       await refreshVisits();
       setSearchText("");
       setSelectedProduct(null);
@@ -235,7 +299,7 @@ function Index() {
       setSelectedVisitId(null);
       setOfficeVisitId(visit.id);
       await refreshVisits();
-      setMode("menu");
+      setCompletionChoiceOpen(true);
       toast.success(`Vistoria ${visit.visit_code ?? "concluída"} concluída.`);
     },
     onError: (error) => toast.error(`Não foi possível concluir a vistoria: ${error.message}`),
@@ -299,10 +363,14 @@ function Index() {
   const handleStartVisit = () => {
     const operator = operatorName.trim();
     if (!operator) {
-      toast.error("Informe o nome do gestor responsável.");
+      toast.error("Não foi possível identificar o utilizador autenticado.");
       return;
     }
-    startVisitMutation.mutate({ supermarket: selectedStore, operator });
+    if (isPriority === null) {
+      toast.error("Indique se a empresa é prioritária ou não.");
+      return;
+    }
+    startVisitMutation.mutate({ supermarket: selectedStore, operator, isPriority });
   };
 
   const handleAddItem = () => {
@@ -319,7 +387,24 @@ function Index() {
       toast.error("Informe uma quantidade maior que zero.");
       return;
     }
-    addItemMutation.mutate({ visitId: activeVisit.id, product: selectedProduct, quantity, priority });
+    const alreadyRequested = activeItems.find((item) => item.product_code === selectedProduct.code)?.quantity ?? 0;
+    if (alreadyRequested + quantity > selectedProduct.stock) {
+      setStockWarningProduct(selectedProduct);
+      return;
+    }
+    addItemMutation.mutate({ visitId: activeVisit.id, product: selectedProduct, quantity });
+  };
+
+  const confirmAddWithInsufficientStock = () => {
+    if (!activeVisit || !selectedProduct) return;
+    const quantity = Number(quantityText);
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      toast.error("Informe uma quantidade maior que zero.");
+      setStockWarningProduct(null);
+      return;
+    }
+    addItemMutation.mutate({ visitId: activeVisit.id, product: selectedProduct, quantity });
+    setStockWarningProduct(null);
   };
 
   const handleCopy = async (text: string, message: string) => {
@@ -356,12 +441,53 @@ function Index() {
   const handleCopyAll = () => {
     if (!officeVisit) return;
     const lines = [
-      ["Código do produto", "Nome/descrição", "Quantidade em falta", "Prioridade"].join("\t"),
+      ["Código do produto", "Nome/descrição", "Quantidade em falta", "Desconto individual (%)", "Desconto geral (%)"].join("\t"),
       ...officeItems.map((item) =>
-        [item.product_code, item.product_name, item.quantity, item.priority].join("\t"),
+        [item.product_code, item.product_name, item.quantity, item.discount_percent, officeVisit.discount_percent].join("\t"),
       ),
     ];
     void handleCopy(lines.join("\n"), "Lista copiada para o lançamento.");
+  };
+
+  const handleExportCsv = () => {
+    if (!officeVisit) return;
+    const quote = (value: string | number | boolean) => `"${String(value).replaceAll('"', '""')}"`;
+    const lines = [
+      [
+        "Código da vistoria",
+        "Supermercado",
+        "Código do produto",
+        "Produto",
+        "Quantidade em falta",
+        "Unidade",
+        "Desconto individual (%)",
+        "Desconto geral (%)",
+        "Lançado no ERP",
+      ].map(quote),
+      ...officeItems.map((item) =>
+        [
+          officeVisit.visit_code ?? "",
+          officeVisit.supermarket,
+          item.product_code,
+          item.product_name,
+          item.quantity,
+          item.unit,
+          item.discount_percent,
+          officeVisit.discount_percent,
+          item.launched ? "Sim" : "Não",
+        ].map(quote),
+      ),
+    ];
+    const csv = `\uFEFF${lines.map((line) => line.join(";")).join("\r\n")}`;
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${officeVisit.visit_code ?? "vistoria"}.csv`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    toast.success("Ficheiro CSV exportado.");
   };
 
   const initials =
@@ -373,17 +499,17 @@ function Index() {
       .join("") || "MA";
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
-      <header className="no-print border-b border-brand-navy/15 bg-brand-navy text-brand-navy-foreground">
-        <div className="mx-auto flex max-w-[1440px] flex-col gap-4 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
+    <main className={mode === "field" && !fieldStarted && !activeVisit ? "flex h-[100svh] flex-col overflow-hidden bg-background text-foreground" : "min-h-screen bg-background text-foreground"}>
+      <header className="no-print shrink-0 border-b border-brand-navy/15 bg-brand-navy text-brand-navy-foreground">
+        <div className={`mx-auto flex max-w-[1440px] flex-col gap-2 px-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8 ${mode === "field" && !fieldStarted && !activeVisit ? "py-2" : "py-4"}`}>
           <div className="flex items-center justify-between gap-5">
             <div className="flex min-w-0 items-center gap-3">
-              <span className="grid size-11 shrink-0 place-items-center rounded-md bg-brand-green text-brand-green-foreground">
+              <span className={`grid shrink-0 place-items-center rounded-md bg-brand-green text-brand-green-foreground ${mode === "field" && !fieldStarted && !activeVisit ? "size-9" : "size-11"}`}>
                 <Boxes className="size-6" aria-hidden="true" />
               </span>
               <div className="min-w-0">
                 <p className="font-display text-lg font-semibold leading-tight">Maxi Armazém</p>
-                <p className="text-xs text-brand-navy-foreground/70">Operação de reposição · Maputo</p>
+                {mode === "field" && !fieldStarted && !activeVisit ? null : <p className="text-xs text-brand-navy-foreground/70">Operação de reposição · Maputo</p>}
               </div>
             </div>
             <div className="flex items-center gap-2 lg:hidden">
@@ -398,7 +524,7 @@ function Index() {
               type="button"
               variant="outline"
               onClick={() => setMode("menu")}
-              className="border-brand-navy-foreground/30 bg-brand-navy-foreground/10 text-brand-navy-foreground hover:bg-brand-navy-foreground/20"
+              className={`border-brand-navy-foreground/30 bg-brand-navy-foreground/10 text-brand-navy-foreground hover:bg-brand-navy-foreground/20 ${mode === "field" && !fieldStarted && !activeVisit ? "h-9" : ""}`}
             >
               <ArrowRight className="rotate-180" aria-hidden="true" />
               Menu inicial
@@ -427,26 +553,31 @@ function Index() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-[1440px] px-4 pb-10 pt-6 sm:px-6 lg:px-8 lg:pt-9">
-        <div className="no-print mb-7 flex flex-col gap-4 border-b border-border pb-6 sm:flex-row sm:items-end sm:justify-between">
+      <div className={mode === "field" && !fieldStarted && !activeVisit ? "mx-auto flex min-h-0 w-full max-w-[1440px] flex-1 flex-col overflow-hidden px-3 pb-2 pt-1 sm:px-6 lg:px-8" : "mx-auto max-w-[1440px] px-4 pb-10 pt-6 sm:px-6 lg:px-8 lg:pt-9"}>
+        <div className={`no-print flex flex-col gap-2 border-b border-border pb-2 sm:flex-row sm:items-end sm:justify-between ${mode === "field" && !fieldStarted && !activeVisit ? "mb-1 shrink-0" : "mb-7"}`}>
           <div>
-            <p className="mb-2 inline-flex items-center gap-2 text-xs font-semibold uppercase text-success">
+            <p className={`mb-1 inline-flex items-center gap-2 text-xs font-semibold uppercase text-success ${mode === "field" && !fieldStarted && !activeVisit ? "hidden" : ""}`}>
               <span className="size-2 rounded-full bg-success" />
               Sistema de gestão flexível
             </p>
             <h1 className="font-display text-3xl font-semibold tracking-normal text-foreground sm:text-4xl">
               {mode === "menu" ? "Área de trabalho" : mode === "field" ? "Vistoria em campo" : mode === "office" ? "Lançamento no escritório" : mode === "cadastro" ? "Cadastro" : "Histórico & relatórios"}
+            <h1 className={`font-display font-semibold tracking-normal text-foreground ${mode === "field" && !fieldStarted && !activeVisit ? "text-lg" : "text-3xl sm:text-4xl"}`}>
+              {mode === "menu" ? "Área de trabalho" : mode === "field" ? "Vistoria em campo" : mode === "office" ? "Lançamento no escritório" : mode === "companies" ? "Cadastro de empresas" : "Histórico & relatórios"}
             </h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
+            <p className={`mt-1 max-w-2xl text-sm leading-5 text-muted-foreground sm:text-base ${mode === "field" && !fieldStarted && !activeVisit ? "hidden" : ""}`}>
               {mode === "menu"
                 ? "Escolha a área em que pretende trabalhar."
                 : mode === "field"
-                  ? "Registe as faltas da loja com rapidez e siga para a próxima secção."
+                  ? (fieldStarted || activeVisit ? "Pesquise os produtos no catálogo e registe as faltas da empresa." : "Escolha a empresa para iniciar uma nova vistoria.")
                   : mode === "office"
                     ? "Transfira os pedidos para o sistema central e acompanhe cada lançamento."
                     : mode === "cadastro"
                       ? "Gira o cadastro das empresas utilizadas nas vistorias."
                       : "Acompanhe as vistorias realizadas e o estado dos lançamentos."}
+                    : mode === "companies"
+                      ? "Cadastre as empresas para as quais a Maxi Armazém realiza vistorias e descontos."
+                      : "Acompanhe o ritmo das vistorias e as reposições pendentes."}
             </p>
           </div>
           {mode === "field" && activeVisit ? (
@@ -459,11 +590,13 @@ function Index() {
 
         {mode === "menu" ? (
           <section className="mx-auto grid max-w-5xl gap-5 py-8 md:grid-cols-2 xl:grid-cols-4">
+          <section className="mx-auto grid max-w-6xl gap-5 py-8 sm:grid-cols-2 xl:grid-cols-4">
             {MODES.map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
                 type="button"
                 onClick={() => { setMode(id); if (id === "office") { setOfficeEntered(false); setOfficeCompany(""); setOfficeVisitId(""); } if (id === "cadastro") setCadastroSection(false); }}
+                onClick={() => { setMode(id); if (id === "field") { setFieldStarted(false); setIsPriority(null); } }}
                 className="group flex min-h-56 flex-col items-start justify-between rounded-xl border border-border bg-card p-7 text-left shadow-sm transition hover:-translate-y-1 hover:border-brand-green hover:shadow-md"
               >
                 <span className="grid size-14 place-items-center rounded-xl bg-brand-green/15 text-brand-navy">
@@ -473,6 +606,7 @@ function Index() {
                   <span className="block font-display text-2xl font-semibold">{label}</span>
                   <span className="mt-2 block text-sm text-muted-foreground">
                     {id === "field" ? "Iniciar e registar uma vistoria nas lojas." : id === "office" ? "Consultar listas e preparar lançamentos." : id === "history" ? "Consultar vistorias e relatórios anteriores." : "Registar e gerir empresas."}
+                    {id === "field" ? "Iniciar e registar uma vistoria nas lojas." : id === "office" ? "Consultar listas e preparar lançamentos." : id === "history" ? "Consultar vistorias e indicadores anteriores." : "Cadastrar e gerir as empresas onde são feitas as vistorias."}
                   </span>
                 </span>
                 <span className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-brand-navy">
@@ -483,18 +617,24 @@ function Index() {
           </section>
         ) : null}
 
-        {mode === "field" ? (
-          <section className="space-y-6">
-            <div className="min-w-0 rounded-md border border-border bg-card p-4 shadow-sm sm:p-6">
-              <div className="mb-5 flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs font-semibold uppercase text-muted-foreground">01 · Preparar visita</p>
-                  <h2 className="mt-1 font-display text-xl font-semibold">Dados da vistoria</h2>
-                </div>
-                <span className="grid size-10 place-items-center rounded-md bg-accent text-accent-foreground">
-                  <Store className="size-5" aria-hidden="true" />
-                </span>
+        {mode === "companies" ? (
+          <section className="mx-auto max-w-4xl space-y-6">
+            <div className="rounded-xl border border-border bg-card p-5 shadow-sm sm:p-7">
+              <div className="flex items-center gap-3">
+                <span className="grid size-12 place-items-center rounded-xl bg-brand-green/15 text-brand-navy"><Building2 className="size-6" aria-hidden="true" /></span>
+                <div><h2 className="font-display text-xl font-semibold">Cadastrar nova empresa</h2><p className="mt-1 text-sm text-muted-foreground">As empresas cadastradas ficam disponíveis na selecção antes de iniciar uma vistoria.</p></div>
               </div>
+              <form className="mt-6 flex flex-col gap-3 sm:flex-row" onSubmit={(event) => { event.preventDefault(); const name = companyName.trim(); if (!name) return; createCompanyMutation.mutate(name); }}>
+                <Input value={companyName} onChange={(event) => setCompanyName(event.target.value)} placeholder="Nome da empresa" aria-label="Nome da empresa" className="h-12 bg-background" maxLength={120} />
+                <Button type="submit" disabled={!companyName.trim() || createCompanyMutation.isPending} className="h-12 shrink-0 bg-brand-green text-brand-green-foreground hover:bg-brand-green/90"><Plus aria-hidden="true" />{createCompanyMutation.isPending ? "A cadastrar…" : "Cadastrar empresa"}</Button>
+              </form>
+            </div>
+            <div className="rounded-xl border border-border bg-card p-5 shadow-sm sm:p-7">
+              <div className="flex items-center justify-between gap-3 border-b border-border pb-4"><div><h2 className="font-display text-xl font-semibold">Empresas cadastradas</h2><p className="mt-1 text-sm text-muted-foreground">Empresas disponíveis para novas vistorias.</p></div><Badge variant="secondary">{data.companies.length}</Badge></div>
+              <div className="divide-y divide-border">{data.companies.length ? data.companies.map((company) => <div key={company.id} className="flex items-center gap-3 py-4"><span className="grid size-10 place-items-center rounded-lg bg-muted text-brand-navy"><Store className="size-5" aria-hidden="true" /></span><span className="min-w-0 flex-1 truncate text-sm font-medium">{company.name}</span><Badge variant="outline">Activa</Badge></div>) : <p className="py-8 text-center text-sm text-muted-foreground">Ainda não existem empresas cadastradas.</p>}</div>
+            </div>
+          </section>
+        ) : null}
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="grid gap-2 text-sm font-medium">
@@ -526,20 +666,65 @@ function Index() {
                         minute: "2-digit",
                       }).format(clock)
                     : "Data e hora automáticas"}
+        {mode === "field" ? (
+          <section className={mode === "field" && !fieldStarted && !activeVisit ? "flex min-h-0 flex-1 flex-col" : "space-y-6"}>
+            {!fieldStarted && !activeVisit ? (
+              <section className="grid min-h-0 flex-1 place-items-center overflow-hidden py-1">
+                <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-3 shadow-lg sm:p-4">
+                  <div className="mx-auto mb-2 grid size-9 place-items-center rounded-xl bg-brand-green/15 text-brand-navy sm:size-10">
+                    <Store className="size-5" aria-hidden="true" />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-success">Vistoria de campo</p>
+                    <h2 className="mt-2 font-display text-2xl font-semibold">Escolher empresa</h2>
+                    <p className="mt-1 text-xs leading-4 text-muted-foreground">Seleccione a empresa onde pretende realizar a vistoria.</p>
+                  </div>
+                  <label className="mt-3 grid gap-1 text-sm font-medium">
+                    Empresa
+                    <Select value={selectedStore} onValueChange={setSelectedStore}>
+                      <SelectTrigger className="h-10 bg-background text-left">
+                        <SelectValue placeholder="Escolha a empresa" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {data.companies.map((company) => (
+                          <SelectItem key={company.id} value={company.name}>{company.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </label>
+                  <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                    <CalendarDays className="size-4" aria-hidden="true" />
+                    {clock
+                      ? new Intl.DateTimeFormat("pt-MZ", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(clock)
+                      : "Data e hora automáticas"}
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    <Button type="button" variant="outline" aria-pressed={isPriority === true} onClick={() => setIsPriority(true)} className={`h-9 ${isPriority === true ? "border-amber-500 bg-amber-500/10 text-amber-700" : "bg-background"}`}>
+                      {isPriority === true ? <CheckCircle2 className="size-4" /> : null}
+                      Prioritária
+                    </Button>
+                    <Button type="button" variant="outline" aria-pressed={isPriority === false} onClick={() => setIsPriority(false)} className={`h-9 ${isPriority === false ? "border-primary bg-primary/10 text-primary" : "bg-background"}`}>
+                      {isPriority === false ? <Check className="size-4" /> : null}
+                      Não prioritária
+                    </Button>
+                  </div>
+                  <Button
+                    type="button"
+                    size="lg"
+                    disabled={!selectedStore || isPriority === null || startVisitMutation.isPending}
+                    onClick={handleStartVisit}
+                    className="mt-3 h-10 w-full bg-brand-green text-brand-green-foreground hover:bg-brand-green/90"
+                  >
+                    {startVisitMutation.isPending ? "A iniciar vistoria…" : "Iniciar vistoria"}
+                    <ArrowRight aria-hidden="true" />
+                  </Button>
                 </div>
-                <Button
-                  type="button"
-                  variant={activeVisit ? "secondary" : "default"}
-                  disabled={Boolean(activeVisit) || startVisitMutation.isPending}
-                  onClick={handleStartVisit}
-                  className="h-11 w-full sm:w-auto"
-                >
-                  {activeVisit ? "Vistoria iniciada" : startVisitMutation.isPending ? "A iniciar…" : "Iniciar vistoria"}
-                  {!activeVisit && <ArrowRight aria-hidden="true" />}
-                </Button>
-              </div>
+              </section>
+            ) : null}
 
-              <div className="mt-7 border-t border-border pt-6">
+            {fieldStarted || activeVisit ? (
+              <section className="space-y-6">
+                <div className="min-w-0 rounded-md border border-border bg-card p-4 shadow-sm sm:p-6">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <div>
                     <p className="text-xs font-semibold uppercase text-muted-foreground">02 · Encontrar produto</p>
@@ -586,7 +771,12 @@ function Index() {
                             <span className="block truncate text-sm font-semibold">{product.name}</span>
                             <span className="mt-0.5 block text-xs text-muted-foreground">{product.code} · {product.category}</span>
                           </span>
-                          <span className="shrink-0 text-xs text-muted-foreground">{product.unit}</span>
+                          <span className="shrink-0 text-right">
+                            <span className="block text-sm font-semibold tabular-nums">{product.stock} un.</span>
+                            <span className={`block text-[10px] font-semibold uppercase ${getStockLevel(product.stock) === "very-low" ? "text-red-600" : getStockLevel(product.stock) === "low" ? "text-amber-600" : "text-green-600"}`}>
+                              {getStockLevel(product.stock) === "very-low" ? "Muito baixo" : getStockLevel(product.stock) === "low" ? "Baixo" : "Normal"}
+                            </span>
+                          </span>
                         </button>
                       ))}
                     </div>
@@ -598,8 +788,11 @@ function Index() {
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold">{selectedProduct.name}</p>
                       <p className="text-xs text-muted-foreground">{selectedProduct.code} · {selectedProduct.category}</p>
+                      <p className="mt-1 text-xs font-semibold">Stock disponível: {selectedProduct.stock} unidades</p>
                     </div>
-                    <Badge variant="outline" className="bg-background">{selectedProduct.unit}</Badge>
+                    <Badge variant="outline" className={getStockLevel(selectedProduct.stock) === "very-low" ? "border-red-200 bg-red-50 text-red-700" : getStockLevel(selectedProduct.stock) === "low" ? "border-amber-200 bg-amber-50 text-amber-700" : "border-green-200 bg-green-50 text-green-700"}>
+                      {getStockLevel(selectedProduct.stock) === "very-low" ? "Stock muito baixo" : getStockLevel(selectedProduct.stock) === "low" ? "Stock baixo" : "Stock normal"}
+                    </Badge>
                   </div>
                 ) : null}
 
@@ -641,26 +834,6 @@ function Index() {
                   </div>
                 </div>
 
-                <div className="mt-5 grid gap-2 text-sm font-medium">
-                  Prioridade
-                  <div className="grid grid-cols-3 gap-2">
-                    {PRIORITIES.map((choice) => (
-                      <Button
-                        key={choice}
-                        type="button"
-                        variant="outline"
-                        aria-pressed={priority === choice}
-                        disabled={!activeVisit}
-                        onClick={() => setPriority(choice)}
-                        className={`h-11 px-2 ${priority === choice ? priorityStyles[choice] : "bg-background"}`}
-                      >
-                        {priority === choice && <Check className="size-4" aria-hidden="true" />}
-                        {choice}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-
                 <Button
                   type="button"
                   size="lg"
@@ -675,7 +848,6 @@ function Index() {
                   <p className="mt-3 text-center text-xs text-muted-foreground">Seleccione a empresa e inicie a vistoria para registar produtos.</p>
                 ) : null}
               </div>
-            </div>
 
             <div className="min-w-0 rounded-md border border-border bg-card p-4 shadow-sm sm:p-6">
               <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4">
@@ -683,9 +855,20 @@ function Index() {
                   <p className="text-xs font-semibold uppercase text-muted-foreground">03 · Rever faltas</p>
                   <h2 className="mt-1 font-display text-xl font-semibold">Lista da vistoria</h2>
                   <p className="mt-1 text-sm text-muted-foreground">{activeVisit?.supermarket ?? selectedStore}</p>
+                   {activeVisit ? <Badge variant="outline" className={activeVisit.is_priority ? "mt-2 border-amber-500/40 bg-amber-500/10 text-amber-700" : "mt-2"}>{activeVisit.is_priority ? "Empresa prioritária" : "Não prioritária"}</Badge> : null}
                 </div>
                 <Badge variant="secondary" className="tabular-nums">{activeItems.length} {activeItems.length === 1 ? "produto" : "produtos"}</Badge>
               </div>
+
+              {activeVisit ? (
+                <div className="mt-4 rounded-lg border border-brand-green/30 bg-brand-green/5 p-4">
+                  <label className="flex flex-col gap-2 text-sm font-semibold sm:flex-row sm:items-center sm:justify-between">
+                    <span>Desconto geral para todos os produtos</span>
+                    <span className="flex items-center gap-2"><Input key={activeVisit.id + String(activeVisit.discount_percent)} type="number" min="0" max="100" step="0.01" defaultValue={activeVisit.discount_percent} aria-label="Desconto geral em percentagem" className="h-10 w-28 bg-background text-right tabular-nums" onBlur={(event) => { const discount = Number(event.currentTarget.value || 0); if (Number.isFinite(discount) && discount >= 0 && discount <= 100 && discount !== activeVisit.discount_percent) discountMutation.mutate({ visitId: activeVisit.id, discount }); else if (!Number.isFinite(discount) || discount < 0 || discount > 100) { event.currentTarget.value = String(activeVisit.discount_percent); toast.error("O desconto deve estar entre 0% e 100%."); } }} /><span>%</span></span>
+                  </label>
+                  <p className="mt-1 text-xs text-muted-foreground">Este desconto é aplicado a todos os produtos. Pode acrescentar um desconto específico em cada produto abaixo.</p>
+                </div>
+              ) : null}
 
               {activeVisit ? (
                 <div className="mt-2 divide-y divide-border">
@@ -705,11 +888,12 @@ function Index() {
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
                             <p className="truncate text-sm font-semibold">{item.product_name}</p>
-                            <Badge className={`px-2 py-0.5 ${priorityStyles[item.priority as Priority] ?? priorityStyles.Normal}`}>
-                              {item.priority}
-                            </Badge>
                           </div>
                           <p className="mt-1 text-xs text-muted-foreground">{item.product_code} · {item.category}</p>
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                            <label className="inline-flex items-center gap-2 text-xs font-medium text-muted-foreground">Desconto individual <Input key={item.id + String(item.discount_percent)} type="number" min="0" max="100" step="0.01" defaultValue={item.discount_percent} aria-label={`Desconto individual de ${item.product_name} em percentagem`} className="h-9 w-20 bg-background text-right tabular-nums" onBlur={(event) => { const discount = Number(event.currentTarget.value || 0); if (Number.isFinite(discount) && discount >= 0 && discount <= 100 && discount !== item.discount_percent) itemDiscountMutation.mutate({ itemId: item.id, discount }); else if (!Number.isFinite(discount) || discount < 0 || discount > 100) { event.currentTarget.value = String(item.discount_percent); toast.error("O desconto deve estar entre 0% e 100%."); } }} /> %</label>
+                            <span className="text-xs font-semibold text-success">Desconto total aplicado: {(100 * (1 - (1 - (activeVisit?.discount_percent ?? 0) / 100) * (1 - item.discount_percent / 100))).toLocaleString("pt-MZ", { maximumFractionDigits: 2 })}%</span>
+                          </div>
                         </div>
                         <div className="flex items-center justify-between gap-3 sm:justify-end">
                           <div className="flex items-center gap-1 rounded-md border border-border p-1">
@@ -761,23 +945,22 @@ function Index() {
                       <ClipboardCheck className="size-6" aria-hidden="true" />
                     </span>
                     <p className="mt-3 text-sm font-medium">Pronto para uma nova vistoria</p>
-                    <p className="mt-1 max-w-xs text-xs leading-5 text-muted-foreground">Selecione a loja, identifique o gestor e comece a registar os produtos em falta.</p>
+                    <p className="mt-1 max-w-xs text-xs leading-5 text-muted-foreground">Seleccione a empresa e inicie a vistoria para começar a registar os produtos em falta.</p>
                   </div>
                 </div>
               )}
 
               <div className="mt-2 border-t border-border pt-4">
                 <div className="mb-4 flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Total de unidades em falta</span>
-                  <span className="font-semibold tabular-nums">{activeItems.reduce((total, item) => total + item.quantity, 0)}</span>
+                  <span className="text-muted-foreground">Total de produtos</span>
+                  <span className="font-semibold tabular-nums">{activeItems.length}</span>
                 </div>
                 <Button
                   type="button"
                   disabled={!activeVisit || !canCompleteVisit(activeItems.length) || completeVisitMutation.isPending}
                   onClick={() => {
                     if (!activeVisit) return;
-                    const confirmed = window.confirm("Tem a certeza de que pretende concluir esta vistoria? Depois de confirmar, voltará ao menu principal.");
-                    if (confirmed) completeVisitMutation.mutate(activeVisit.id);
+                    setCompletionConfirmOpen(true);
                   }}
                   className="h-12 w-full bg-brand-navy text-brand-navy-foreground hover:bg-brand-navy/90"
                 >
@@ -786,6 +969,8 @@ function Index() {
                 </Button>
               </div>
             </div>
+              </section>
+            ) : null}
           </section>
         ) : null}
 
@@ -840,6 +1025,8 @@ function Index() {
                     <p className="text-xs font-semibold uppercase text-muted-foreground">Guia de separação</p>
                     <h2 className="mt-1 font-display text-2xl font-semibold">{officeVisit.supermarket}</h2>
                     <p className="mt-1 text-sm text-muted-foreground">{officeVisit.visit_code} · {formatDateTime(officeVisit.started_at)} · {officeVisit.operator_name}</p>
+                    <p className="mt-1 text-sm font-semibold text-success">Desconto geral da empresa: {officeVisit.discount_percent}%</p>
+                    <p className="mt-1 text-sm font-semibold">{officeVisit.is_priority ? "Empresa prioritária" : "Não prioritária"}</p>
                   </div>
                   <Badge className={officeVisit.status === "launched" ? "border-success/20 bg-success/10 text-success" : "border-warning/20 bg-warning/10 text-warning-foreground"}>
                     {officeVisit.status === "launched" ? "Lançamento concluído" : "Lançamento pendente"}
@@ -853,7 +1040,6 @@ function Index() {
                         <th className="px-4 py-3 font-semibold">Código do produto</th>
                         <th className="px-4 py-3 font-semibold">Nome / descrição</th>
                         <th className="px-4 py-3 font-semibold">Quantidade</th>
-                        <th className="px-4 py-3 font-semibold">Prioridade</th>
                         <th className="px-4 py-3 font-semibold">Copiar</th>
                         <th className="px-4 py-3 font-semibold">Lançado no ERP</th>
                       </tr>
@@ -864,12 +1050,9 @@ function Index() {
                           <td className="whitespace-nowrap px-4 py-4 font-mono text-xs">{item.product_code}</td>
                           <td className="px-4 py-4">
                             <p className={`font-medium ${item.launched ? "line-through" : ""}`}>{item.product_name}</p>
-                            <p className="mt-1 text-xs text-muted-foreground">{item.category}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">{item.category}</p><p className="mt-1 text-xs text-success">Desconto individual: {item.discount_percent}% · Desconto total aplicado: {(100 * (1 - (1 - officeVisit.discount_percent / 100) * (1 - item.discount_percent / 100))).toLocaleString("pt-MZ", { maximumFractionDigits: 2 })}%</p>
                           </td>
                           <td className="whitespace-nowrap px-4 py-4 font-semibold tabular-nums">{item.quantity} {item.unit}</td>
-                          <td className="px-4 py-4">
-                            <Badge className={priorityStyles[item.priority as Priority] ?? priorityStyles.Normal}>{item.priority}</Badge>
-                          </td>
                           <td className="px-4 py-4">
                             <Button
                               type="button"
@@ -961,6 +1144,7 @@ function Index() {
                     <SelectContent>
                       <SelectItem value="all">Todos os supermercados</SelectItem>
                       {companies.map((store) => <SelectItem key={store} value={store}>{store}</SelectItem>)}
+                      {data.companies.map((company) => <SelectItem key={company.id} value={company.name}>{company.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </label>
@@ -1051,11 +1235,60 @@ function Index() {
           </section>
         ) : null}
 
-        <footer className="no-print mt-10 flex flex-col gap-2 border-t border-border pt-4 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+        {completionChoiceOpen ? (
+        <div className="no-print fixed inset-0 z-50 grid place-items-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="completion-choice-title">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl sm:p-8">
+            <span className="mx-auto grid size-14 place-items-center rounded-full bg-success/10 text-success">
+              <CheckCircle2 className="size-7" aria-hidden="true" />
+            </span>
+            <h2 id="completion-choice-title" className="mt-4 text-center font-display text-2xl font-semibold">Vistoria finalizada</h2>
+            <p className="mt-2 text-center text-sm leading-6 text-muted-foreground">A vistoria foi guardada com sucesso. O que pretende fazer agora?</p>
+            <div className="mt-7 grid gap-3 sm:grid-cols-2">
+              <Button type="button" variant="outline" className="h-12" onClick={() => { setCompletionChoiceOpen(false); setFieldStarted(false); setMode("menu"); }}>
+                Voltar ao menu principal
+              </Button>
+              <Button type="button" className="h-12 bg-brand-green text-brand-green-foreground hover:bg-brand-green/90" onClick={() => { setCompletionChoiceOpen(false); setFieldStarted(false); setMode("office"); }}>
+                Ver relatório da vistoria
+                <ArrowRight aria-hidden="true" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {mode === "field" && !fieldStarted && !activeVisit ? null : <footer className="no-print mt-10 flex flex-col gap-2 border-t border-border pt-4 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <span className="inline-flex items-center gap-2"><MapPin className="size-3.5" aria-hidden="true" /> Operação Maxi Armazém · Maputo, Moçambique</span>
           <span>Catálogo de demonstração · {PRODUCT_CATALOG.length} produtos</span>
-        </footer>
+        </footer>}
       </div>
+
+      {stockWarningProduct ? (
+        <div className="no-print fixed inset-0 z-[60] grid place-items-center bg-black/60 p-4" role="alertdialog" aria-modal="true" aria-labelledby="stock-warning-title">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl">
+            <span className="mx-auto grid size-14 place-items-center rounded-full bg-amber-500/10 text-amber-600"><Package className="size-7" aria-hidden="true" /></span>
+            <h2 id="stock-warning-title" className="mt-4 text-center font-display text-xl font-semibold">Stock insuficiente</h2>
+            <p className="mt-2 text-center text-sm leading-6 text-muted-foreground">O produto <strong className="text-foreground">{stockWarningProduct.name}</strong> tem {stockWarningProduct.stock} unidades disponíveis, mas está a solicitar {quantityText}. Deseja adicionar este produto mesmo assim?</p>
+            <p className="mt-2 text-center text-xs text-muted-foreground">A quantidade registada na vistoria não altera nem desconta o stock do Primavera.</p>
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              <Button type="button" variant="outline" onClick={() => setStockWarningProduct(null)}>Não adicionar</Button>
+              <Button type="button" disabled={addItemMutation.isPending} onClick={confirmAddWithInsufficientStock} className="bg-brand-green text-brand-green-foreground hover:bg-brand-green/90">{addItemMutation.isPending ? "A adicionar…" : "Sim, adicionar"}</Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {completionConfirmOpen ? (
+        <div className="no-print fixed inset-0 z-[60] grid place-items-center bg-black/60 p-4" role="alertdialog" aria-modal="true" aria-labelledby="completion-confirm-title">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl">
+            <h2 id="completion-confirm-title" className="font-display text-xl font-semibold">Concluir vistoria?</h2>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">Tem a certeza de que pretende finalizar esta vistoria? Depois de concluir, poderá consultar o relatório no Escritório.</p>
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              <Button type="button" variant="outline" onClick={() => setCompletionConfirmOpen(false)}>Cancelar</Button>
+              <Button type="button" disabled={completeVisitMutation.isPending} onClick={() => { if (activeVisit) completeVisitMutation.mutate(activeVisit.id); setCompletionConfirmOpen(false); }} className="bg-brand-green text-brand-green-foreground hover:bg-brand-green/90">Sim, concluir</Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }

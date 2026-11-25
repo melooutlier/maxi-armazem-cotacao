@@ -21,6 +21,36 @@
       "version": "7",
       "when": 1795600000000,
       "tag": "0002_companies",
+      "when": 1795598627464,
+      "tag": "0002_fix_visit_items_access",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1795599791507,
+      "tag": "0003_companies_and_discounts",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795600173375,
+      "tag": "0004_ensure_companies_and_discounts",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1795605346937,
+      "tag": "0005_visit_company_priority",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1795607597622,
+      "tag": "0006_ensure_visit_priority",
       "breakpoints": true
     }
   ]
