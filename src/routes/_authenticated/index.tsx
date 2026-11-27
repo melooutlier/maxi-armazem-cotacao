@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
@@ -17,10 +18,10 @@ type Page = "home" | "dashboard" | "orders" | "routes" | "catalog" | "companies"
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({ meta: [
-    { title: "Maxi Armazém | Encomendas e Rotas" },
-    { name: "description", content: "Gestão de encomendas, catálogo e rotas da equipa Maxi Armazém." },
-    { property: "og:title", content: "Maxi Armazém | Encomendas e Rotas" },
-    { property: "og:description", content: "Gestão de encomendas, catálogo e rotas da equipa Maxi Armazém." },
+    { title: "NESPECTIONA | Gestão de operações" },
+    { name: "description", content: "Gestão de encomendas, catálogo e rotas da equipa NESPECTIONA." },
+    { property: "og:title", content: "NESPECTIONA | Gestão de operações" },
+    { property: "og:description", content: "Gestão de encomendas, catálogo e rotas da equipa NESPECTIONA." },
     { property: "og:type", content: "website" },
     { name: "twitter:card", content: "summary" },
   ] }),
@@ -333,19 +334,19 @@ function Workspace() {
     ? [{ id: "dashboard", label: "Painel de controlo" }, { id: "orders", label: "Encomendas" }, { id: "routes", label: "Rotas" }, { id: "catalog", label: "Produtos e marcas" }, { id: "companies", label: "Empresas" }, { id: "users", label: "Utilizadores" }, { id: "history", label: "Histórico e relatórios" }]
     : [{ id: "orders", label: "Encomendas" }, { id: "routes", label: "Rotas" }, { id: "history", label: "Histórico" }];
 
-  if (loading) return <main className="grid min-h-screen place-items-center bg-slate-50 text-slate-600">A carregar Maxi Armazém…</main>;
+  if (loading) return <main className="grid min-h-screen place-items-center bg-slate-50 text-slate-600">A carregar NESPECTIONA…</main>;
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
       <header className="border-b bg-white">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-4">
-          <div><p className="text-xs font-semibold uppercase tracking-[.18em] text-emerald-700">Maxi Armazém</p><h1 className="text-xl font-bold">Gestão de Encomendas e Rotas</h1></div>
-          <div className="flex items-center gap-3 text-sm"><span className="rounded-full bg-slate-100 px-3 py-2">{username} · {isAdmin ? "Administrador" : "Utilizador"}</span><button className="rounded-lg border px-3 py-2 hover:bg-slate-50" onClick={() => void supabase.auth.signOut().then(() => window.location.assign("/auth"))}>Sair</button></div>
+          <div><p className="text-xs font-semibold uppercase tracking-[.18em] text-emerald-700">NESPECTIONA</p><h1 className="text-xl font-bold">Gestão de Encomendas e Rotas</h1></div>
+          <div className="flex items-center gap-3 text-sm"><span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-2"><UserRound className="h-4 w-4 text-slate-500" aria-hidden="true" /><span>{username}</span></span><button className="rounded-lg border px-3 py-2 hover:bg-slate-50" onClick={() => void supabase.auth.signOut().then(() => window.location.assign("/auth"))}>Sair</button></div>
         </div>
       </header>
       <div className="mx-auto max-w-7xl px-4 py-8">
         <section className="min-w-0">
-          {page !== "home" && <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><button onClick={() => setPage("home")} className="inline-flex items-center gap-2 rounded-xl border bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">← Menu principal</button><span className="text-sm text-slate-500">{username} · {isAdmin ? "Administrador" : "Utilizador"}</span></div>}
+          {page !== "home" && <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><button onClick={() => setPage("home")} className="inline-flex items-center gap-2 rounded-xl border bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">← Menu principal</button><span className="inline-flex items-center gap-2 text-sm text-slate-500"><UserRound className="h-4 w-4" aria-hidden="true" />{username}</span></div>}
           {page === "home" && <div className="mx-auto max-w-5xl py-8"><div className="mb-8 text-center"><h2 className="text-3xl font-bold tracking-tight">Menu principal</h2><p className="mt-2 text-slate-500">Seleccione a área que pretende abrir.</p></div><div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">{nav.map((item) => <button key={item.id} onClick={() => setPage(item.id)} className="group flex min-h-44 flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-7 text-center shadow-sm transition hover:-translate-y-1 hover:border-emerald-600 hover:shadow-md"><span className="mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-emerald-50 text-2xl font-bold text-emerald-700">{({dashboard:"▦",orders:"▤",routes:"⌖",catalog:"▧",companies:"⌂",users:"♙",history:"◷"} as Record<string,string>)[item.id]}</span><span className="text-lg font-semibold text-slate-900">{item.label}</span><span className="mt-2 text-sm text-slate-500">Abrir secção</span></button>)}</div></div>}
           {page === "dashboard" && isAdmin && <div className="space-y-5"><h2 className="text-2xl font-bold">Painel de controlo</h2><div className="grid gap-4 sm:grid-cols-3"><Metric label="Encomendas" value={orders.length}/><Metric label="Produtos activos" value={products.filter(p=>p.active).length}/><Metric label="Empresas activas" value={activeCompanies.length}/></div><div className="rounded-2xl border bg-white p-5"><h3 className="font-semibold">Operação</h3><p className="mt-2 text-sm text-slate-600">Acompanhe encomendas, atribua rotas diárias e mantenha o catálogo actualizado.</p></div></div>}
 
