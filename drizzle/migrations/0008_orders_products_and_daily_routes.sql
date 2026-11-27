@@ -72,7 +72,7 @@ CREATE TABLE IF NOT EXISTS public.daily_routes (
   notes text,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT daily_routes_date_user_unique UNIQUE (route_date, assigned_user_id)
+  CONSTRAINT daily_routes_date_unique UNIQUE (route_date)
 );
 
 CREATE INDEX IF NOT EXISTS daily_routes_date_idx ON public.daily_routes (route_date DESC);
