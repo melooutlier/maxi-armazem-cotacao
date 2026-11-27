@@ -19,8 +19,6 @@
     {
       "idx": 2,
       "version": "7",
-      "when": 1795600000000,
-      "tag": "0002_companies",
       "when": 1795598627464,
       "tag": "0002_fix_visit_items_access",
       "breakpoints": true
@@ -51,6 +49,13 @@
       "version": "7",
       "when": 1795607597622,
       "tag": "0006_ensure_visit_priority",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1795763040000,
+      "tag": "0007_user_profiles_and_admin_policies",
       "breakpoints": true
     }
   ]
