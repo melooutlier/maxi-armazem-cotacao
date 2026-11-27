@@ -57,6 +57,13 @@
       "when": 1795763040000,
       "tag": "0007_user_profiles_and_admin_policies",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1795764000000,
+      "tag": "0008_orders_products_and_daily_routes",
+      "breakpoints": true
     }
   ]
 }
