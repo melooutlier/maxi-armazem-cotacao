@@ -106,6 +106,13 @@
       "when": 1795769600000,
       "tag": "0014_demo_catalogue_and_brand_families",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1795770000000,
+      "tag": "0015_product_image_uploads",
+      "breakpoints": true
     }
   ]
 }
