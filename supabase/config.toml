@@ -1,1 +1,7 @@
 project_id = "hcatudifmzwisrtqnyfi"
+
+[functions.username-login]
+verify_jwt = false
+
+[functions.manage-users]
+verify_jwt = true
