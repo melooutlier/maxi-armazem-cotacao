@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -220,7 +220,7 @@ function Workspace() {
     if (error) toast.error(error.message); else { setNewFamily(""); await loadData(); }
   }
 
-  async function addProduct(event: React.FormEvent) {
+  async function addProduct(event: FormEvent) {
     event.preventDefault();
     const { error } = await supabase.from("products").insert({
       ...productForm, brand_id: productForm.brand_id || null, category_id: productForm.category_id || null, family_id: productForm.family_id || null,
