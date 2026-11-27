@@ -18,10 +18,10 @@ type Page = "home" | "dashboard" | "orders" | "routes" | "catalog" | "companies"
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({ meta: [
-    { title: "NESPECTIONA | Gestão de operações" },
-    { name: "description", content: "Gestão de encomendas, catálogo e rotas da equipa NESPECTIONA." },
-    { property: "og:title", content: "NESPECTIONA | Gestão de operações" },
-    { property: "og:description", content: "Gestão de encomendas, catálogo e rotas da equipa NESPECTIONA." },
+    { title: "NESPECTION | Gestão de operações" },
+    { name: "description", content: "Gestão de encomendas, catálogo e rotas da equipa NESPECTION." },
+    { property: "og:title", content: "NESPECTION | Gestão de operações" },
+    { property: "og:description", content: "Gestão de encomendas, catálogo e rotas da equipa NESPECTION." },
     { property: "og:type", content: "website" },
     { name: "twitter:card", content: "summary" },
   ] }),
@@ -334,13 +334,13 @@ function Workspace() {
     ? [{ id: "dashboard", label: "Painel de controlo" }, { id: "orders", label: "Encomendas" }, { id: "routes", label: "Rotas" }, { id: "catalog", label: "Produtos e marcas" }, { id: "companies", label: "Empresas" }, { id: "users", label: "Utilizadores" }, { id: "history", label: "Histórico e relatórios" }]
     : [{ id: "orders", label: "Encomendas" }, { id: "routes", label: "Rotas" }, { id: "history", label: "Histórico" }];
 
-  if (loading) return <main className="grid min-h-screen place-items-center bg-slate-50 text-slate-600">A carregar NESPECTIONA…</main>;
+  if (loading) return <main className="grid min-h-screen place-items-center bg-slate-50 text-slate-600">A carregar NESPECTION…</main>;
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
       <header className="border-b bg-white">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-4">
-          <div><p className="text-xs font-semibold uppercase tracking-[.18em] text-emerald-700">NESPECTIONA</p><h1 className="text-xl font-bold">Gestão de Encomendas e Rotas</h1></div>
+          <div><p className="text-xs font-semibold uppercase tracking-[.18em] text-emerald-700">NESPECTION</p><h1 className="text-xl font-bold">Gestão de Encomendas e Rotas</h1></div>
           <div className="flex items-center gap-3 text-sm"><span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-2"><UserRound className="h-4 w-4 text-slate-500" aria-hidden="true" /><span>{username}</span></span><button className="rounded-lg border px-3 py-2 hover:bg-slate-50" onClick={() => void supabase.auth.signOut().then(() => window.location.assign("/auth"))}>Sair</button></div>
         </div>
       </header>
