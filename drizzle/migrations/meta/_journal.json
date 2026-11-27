@@ -71,6 +71,13 @@
       "when": 1795764797657,
       "tag": "0009_first_admin_bootstrap",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1795765724550,
+      "tag": "0010_restrict_companies_read_to_staff",
+      "breakpoints": true
     }
   ]
 }
