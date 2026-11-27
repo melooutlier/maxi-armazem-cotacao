@@ -6,7 +6,7 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const usernamePattern = /^[a-z0-9][a-z0-9._-]{2,39}$/;
+const usernamePattern = /^[A-Za-z0-9][A-Za-z0-9._-]{2,39}$/;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -26,11 +26,11 @@ Deno.serve(async (req) => {
       return Response.json({ adminCount: count ?? 0 }, { headers: corsHeaders });
     }
 
-    const normalizedUsername = String(body.username ?? "").trim().toLowerCase();
+    const username = String(body.username ?? "").trim();
     const password = String(body.password ?? "");
 
     if (action === "bootstrap") {
-      if (!usernamePattern.test(normalizedUsername)) {
+      if (!usernamePattern.test(username)) {
         return Response.json({ error: "O nome de utilizador deve ter 3 a 40 caracteres e usar apenas letras, números, ponto, hífen ou underscore." }, { headers: corsHeaders });
       }
       if (password.length < 8) {
@@ -42,12 +42,12 @@ Deno.serve(async (req) => {
         return Response.json({ error: "O primeiro administrador já foi criado. Entre com a sua conta." }, { headers: corsHeaders });
       }
 
-      const email = `${normalizedUsername}@users.maxi.local`;
+      const email = `${username}@users.maxi.local`;
       const { data: created, error: createError } = await admin.auth.admin.createUser({
         email,
         password,
         email_confirm: true,
-        user_metadata: { username: normalizedUsername, display_name: normalizedUsername },
+        user_metadata: { username: username, display_name: username },
       });
       if (createError || !created.user) {
         return Response.json({ error: createError?.message ?? "Não foi possível criar o primeiro administrador." }, { headers: corsHeaders });
@@ -55,7 +55,7 @@ Deno.serve(async (req) => {
 
       const { error: claimError } = await admin.rpc("claim_first_admin", {
         _user_id: created.user.id,
-        _username: normalizedUsername,
+        _username: username,
       });
       if (claimError) {
         await admin.auth.admin.deleteUser(created.user.id);
@@ -71,11 +71,11 @@ Deno.serve(async (req) => {
       return Response.json({ session: data.session, firstAdmin: true }, { headers: corsHeaders });
     }
 
-    if (!usernamePattern.test(normalizedUsername) || !password) {
+    if (!usernamePattern.test(username) || !password) {
       return Response.json({ error: "Nome de utilizador ou palavra-passe inválidos." }, { status: 400, headers: corsHeaders });
     }
 
-    const { data: profile } = await admin.from("user_profiles").select("user_id").eq("username", normalizedUsername).maybeSingle();
+    const { data: profile } = await admin.from("user_profiles").select("user_id").eq("username", username).maybeSingle();
     if (!profile) return Response.json({ error: "Credenciais inválidas." }, { status: 401, headers: corsHeaders });
 
     const { data: authUser, error: userError } = await admin.auth.admin.getUserById(profile.user_id);
