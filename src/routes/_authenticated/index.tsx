@@ -85,7 +85,7 @@ function Workspace() {
       const admin = (rolesRes.data ?? []).some((r) => r.role === "admin");
       setIsAdmin(admin);
       if (!initialized.current) { setPage(admin ? "dashboard" : "orders"); initialized.current = true; }
-      setUsername(profileRes.data?.username ?? String(auth.user.user_metadata?.username ?? "Utilizador"));
+      setUsername(profileRes.data?.username ?? String(auth.user.user_metadata?.["username"] ?? "Utilizador"));
       setCompanies(companiesRes.data ?? []);
       setProducts(productsRes.data ?? []);
       setBrands(brandsRes.data ?? []);
@@ -341,7 +341,7 @@ function buildXlsx(rows: (string | number)[][]): Blob {
     for (const byte of data) { crc ^= byte; for (let k = 0; k < 8; k++) crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0); }
     return (crc ^ 0xffffffff) >>> 0;
   };
-  const local: Uint8Array[] = [], central: Uint8Array[] = [];
+  const local: Uint8Array<ArrayBuffer>[] = [], central: Uint8Array<ArrayBuffer>[] = [];
   let offset = 0;
   for (const [name, value] of Object.entries(files)) {
     const filename = encoder.encode(name), data = encoder.encode(value), crc = crc32(data);

@@ -3,6 +3,7 @@
 - [x] Atualizar o indicador de economia para 20 minutos por vistoria.
 - [x] Confirmar perfis personalizados, descontos percentuais e limites de stock por produto.
 - [ ] Implementar login com perfis e restringir vistorias a utilizadores autenticados.
+- [x] Permitir a criação segura do primeiro administrador no ecrã de acesso.
 - [ ] Implementar cadastro de empresas, prioridades opcionais e cópia no formato do ERP.
 - [ ] Ligar o stock ao ERP (aguardando o nome do sistema e a disponibilidade de integração).
 - [ ] Validar os fluxos, os avisos de segurança, os metadados e os testes; guardar as alterações.
