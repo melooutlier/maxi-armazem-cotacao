@@ -87,7 +87,7 @@ Deno.serve(async (req) => {
 
     if (action === "update") {
       const userId = String(body.userId ?? "");
-      const username = String(body.username ?? "").trim();
+      const username = String(body.username ?? "");
       const isAdmin = body.isAdmin === true;
       const active = body.active !== false;
       if (!userId || !/^[A-Za-z0-9][A-Za-z0-9._-]{2,39}$/.test(username)) return Response.json({ error: "Dados da conta inválidos." }, { status: 400, headers: corsHeaders });
