@@ -62,9 +62,10 @@ Deno.serve(async (req) => {
       const isAdmin = body.isAdmin === true;
       const active = body.active !== false;
       if (!userId || !/^[a-z0-9][a-z0-9._-]{2,39}$/.test(username)) return Response.json({ error: "Dados da conta inválidos." }, { status: 400, headers: corsHeaders });
-      if (userId === authData.user.id && !isAdmin) return Response.json({ error: "Não pode retirar as próprias permissões administrativas." }, { status: 400, headers: corsHeaders });
+      if (userId === authData.user.id && (!isAdmin || !active)) return Response.json({ error: "Não pode retirar as próprias permissões administrativas nem desactivar a sua conta." }, { status: 400, headers: corsHeaders });
 
       const { data: targetRole } = await admin.from("user_roles").select("id").eq("user_id", userId).eq("role", "admin").maybeSingle();
+      if (targetRole && !active) return Response.json({ error: "Retire primeiro as permissões administrativas antes de desactivar esta conta." }, { status: 400, headers: corsHeaders });
       if (targetRole && !isAdmin) {
         const { count } = await admin.from("user_roles").select("id", { count: "exact", head: true }).eq("role", "admin");
         if ((count ?? 0) <= 1) return Response.json({ error: "O sistema precisa de pelo menos um administrador." }, { status: 400, headers: corsHeaders });
