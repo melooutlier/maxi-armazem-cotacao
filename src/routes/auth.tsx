@@ -9,9 +9,9 @@ export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
       { title: "Entrar | Maxi Armazém" },
-      { name: "description", content: "Acesso da equipa Maxi Armazém às vistorias." },
+      { name: "description", content: "Acesso à plataforma Maxi Armazém." },
       { property: "og:title", content: "Entrar | Maxi Armazém" },
-      { property: "og:description", content: "Acesso da equipa Maxi Armazém às vistorias." },
+      { property: "og:description", content: "Acesso à plataforma Maxi Armazém." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -21,8 +21,6 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"in" | "up">("in");
-  const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -30,24 +28,23 @@ function AuthPage() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
-    const { error } =
-      mode === "in"
-        ? await supabase.auth.signInWithPassword({ email, password })
-        : await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-              data: { username: username.trim(), display_name: username.trim() },
-              emailRedirectTo: window.location.origin,
-            },
-          });
-    setBusy(false);
-    if (error) {
-      toast.error(error.message);
+    const { data, error } = await supabase.functions.invoke<{
+      session?: { access_token: string; refresh_token: string };
+      error?: string;
+    }>("username-login", {
+      body: { username: username.trim(), password },
+    });
+
+    if (error || !data?.session) {
+      setBusy(false);
+      toast.error(data?.error ?? "Nome de utilizador ou palavra-passe inválidos.");
       return;
     }
-    if (mode === "up") {
-      toast.success("Conta criada. Confirme o seu email para entrar.");
+
+    const { error: sessionError } = await supabase.auth.setSession(data.session);
+    setBusy(false);
+    if (sessionError) {
+      toast.error("Não foi possível iniciar a sessão. Tente novamente.");
       return;
     }
     navigate({ to: "/" });
@@ -58,17 +55,32 @@ function AuthPage() {
       <form onSubmit={submit} className="w-full max-w-sm space-y-4 rounded-lg border bg-card p-6 shadow-sm">
         <h1 className="text-2xl font-semibold text-foreground">Maxi Armazém</h1>
         <p className="text-sm text-muted-foreground">
-          {mode === "in" ? "Entre para aceder às vistorias." : "Crie a sua conta da equipa."}
+          Entre com o seu nome de utilizador e palavra-passe.
         </p>
-        {mode === "up" ? <Input type="text" placeholder="Nome de utilizador" value={username} onChange={(e) => setUsername(e.target.value)} required maxLength={40} /> : null}
-        <Input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-        <Input type="password" placeholder="Palavra-passe" minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} required />
+        <Input
+          type="text"
+          placeholder="Nome de utilizador"
+          autoComplete="username"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          required
+          minLength={3}
+          maxLength={40}
+        />
+        <Input
+          type="password"
+          placeholder="Palavra-passe"
+          autoComplete="current-password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+        />
         <Button type="submit" className="w-full" disabled={busy}>
-          {mode === "in" ? "Entrar" : "Criar conta"}
+          {busy ? "A entrar…" : "Entrar"}
         </Button>
-        <button type="button" className="w-full text-sm text-muted-foreground underline" onClick={() => setMode(mode === "in" ? "up" : "in")}>
-          {mode === "in" ? "Não tem conta? Criar conta" : "Já tem conta? Entrar"}
-        </button>
+        <p className="text-center text-xs text-muted-foreground">
+          As contas são criadas pelo administrador do sistema.
+        </p>
       </form>
     </main>
   );
