@@ -62,6 +62,7 @@ function Workspace() {
   const [newBrand, setNewBrand] = useState("");
   const [newCategory, setNewCategory] = useState("");
   const [productForm, setProductForm] = useState({ code: "", name: "", description: "", unit: "UN", brand_id: "", category_id: "", image_url: "" });
+  const [productImageFile, setProductImageFile] = useState<File | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [newUsername, setNewUsername] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -267,9 +268,30 @@ function Workspace() {
 
   async function addProduct(event: FormEvent) {
     event.preventDefault();
+    let imageUrl = productForm.image_url || null;
+    if (productImageFile) {
+      if (!productImageFile.type.startsWith("image/")) {
+        toast.error("Seleccione um ficheiro de imagem válido.");
+        return;
+      }
+      if (productImageFile.size > 5 * 1024 * 1024) {
+        toast.error("A imagem não pode ultrapassar 5 MB.");
+        return;
+      }
+      const extension = productImageFile.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
+      const imagePath = "products/" + crypto.randomUUID() + "." + extension;
+      const { error: uploadError } = await supabase.storage.from("product-images").upload(imagePath, productImageFile, {
+        cacheControl: "3600", upsert: false, contentType: productImageFile.type,
+      });
+      if (uploadError) {
+        toast.error("Não foi possível carregar a imagem: " + uploadError.message);
+        return;
+      }
+      imageUrl = supabase.storage.from("product-images").getPublicUrl(imagePath).data.publicUrl;
+    }
     const payload = {
       ...productForm, brand_id: productForm.brand_id || null, category_id: productForm.category_id || null,
-      image_url: productForm.image_url || null, description: productForm.description || null,
+      image_url: imageUrl, description: productForm.description || null,
     };
     const { error } = editingProduct
       ? await supabase.from("products").update({ ...payload, updated_at: new Date().toISOString() }).eq("id", editingProduct.id)
@@ -277,6 +299,7 @@ function Workspace() {
     if (error) toast.error(error.message); else {
       setProductForm({ code: "", name: "", description: "", unit: "UN", brand_id: "", category_id: "", image_url: "" });
       setEditingProduct(null);
+      setProductImageFile(null);
       await loadData(); toast.success(editingProduct ? "Produto actualizado." : "Produto adicionado ao catálogo.");
     }
   }
@@ -288,6 +311,7 @@ function Workspace() {
 
   function startProductEdit(product: Product) {
     setEditingProduct(product);
+    setProductImageFile(null);
     setProductForm({
       code: product.code, name: product.name, description: product.description ?? "",
       unit: product.unit, brand_id: product.brand_id ?? "", category_id: product.category_id ?? "",
@@ -297,6 +321,7 @@ function Workspace() {
 
   function cancelProductEdit() {
     setEditingProduct(null);
+    setProductImageFile(null);
     setProductForm({ code: "", name: "", description: "", unit: "UN", brand_id: "", category_id: "", image_url: "" });
   }
 
@@ -368,7 +393,7 @@ function Workspace() {
             {!routes.some(r=>r.route_date===routeDate&&(isAdmin||r.assigned_user_id===userId))&&<Empty text="Não existe uma rota atribuída para esta data."/>}</div>}
 
           {page === "catalog" && isAdmin && <div className="space-y-5"><h2 className="text-2xl font-bold">Produtos e marcas</h2><div className="mx-auto grid w-full max-w-4xl gap-5 md:grid-cols-2"><div className="rounded-2xl border bg-white p-5 text-center"><h3 className="font-bold">Categorias / tipos</h3><div className="mx-auto mt-3 flex w-full max-w-md justify-center gap-2"><input className="min-w-0 flex-1 rounded-xl border px-3 py-2 text-center" placeholder="Nome da categoria" value={newCategory} onChange={e=>setNewCategory(e.target.value)}/><button onClick={()=>void addCategory()} className="shrink-0 rounded-xl bg-emerald-700 px-4 text-white">Adicionar</button></div><div className="mt-4 flex flex-wrap justify-center gap-2">{categories.map(category=><span key={category.id} className="inline-flex items-center gap-1 rounded-full bg-slate-100 py-1 pl-3 pr-1 text-sm">{category.name}<button type="button" onClick={()=>void deleteCategory(category)} aria-label={`Remover categoria ${category.name}`} title="Remover categoria" className="ml-1 grid h-6 w-6 place-items-center rounded-full text-slate-500 hover:bg-red-100 hover:text-red-700 focus:outline-none focus:ring-2 focus:ring-red-400">×</button></span>)}</div></div><div className="rounded-2xl border bg-white p-5 text-center"><h3 className="font-bold">Marcas</h3><div className="mx-auto mt-3 flex w-full max-w-md justify-center gap-2"><input className="min-w-0 flex-1 rounded-xl border px-3 py-2 text-center" placeholder="Nome da marca" value={newBrand} onChange={e=>setNewBrand(e.target.value)}/><button onClick={()=>void addBrand()} className="shrink-0 rounded-xl bg-emerald-700 px-4 text-white">Adicionar</button></div><div className="mt-4 flex flex-wrap justify-center gap-2">{brands.map(b=><span key={b.id} className="inline-flex items-center gap-1 rounded-full bg-slate-100 py-1 pl-3 pr-1 text-sm">{b.name}<button type="button" onClick={()=>void deleteBrand(b)} aria-label={`Remover marca ${b.name}`} title="Remover marca" className="ml-1 grid h-6 w-6 place-items-center rounded-full text-slate-500 hover:bg-red-100 hover:text-red-700 focus:outline-none focus:ring-2 focus:ring-red-400">×</button></span>)}</div></div></div>
-            <form onSubmit={addProduct} className="rounded-2xl border bg-white p-5"><h3 className="font-bold">{editingProduct ? "Editar produto" : "Cadastrar produto"}</h3><div className="mt-3 grid gap-3 sm:grid-cols-2"><input required className="rounded-xl border px-3 py-3" placeholder="Código / Artigo" value={productForm.code} onChange={e=>setProductForm(p=>({...p,code:e.target.value}))}/><input required className="rounded-xl border px-3 py-3" placeholder="Nome do produto" value={productForm.name} onChange={e=>setProductForm(p=>({...p,name:e.target.value}))}/><input className="rounded-xl border px-3 py-3" placeholder="Descrição adicional" value={productForm.description} onChange={e=>setProductForm(p=>({...p,description:e.target.value}))}/><input className="rounded-xl border px-3 py-3" placeholder="Unidade (ex.: UN)" value={productForm.unit} onChange={e=>setProductForm(p=>({...p,unit:e.target.value}))}/><select className="rounded-xl border px-3 py-3" value={productForm.category_id} onChange={e=>setProductForm(p=>({...p,category_id:e.target.value}))}><option value="">Seleccionar categoria / tipo</option>{categories.map(category=><option key={category.id} value={category.id}>{category.name}</option>)}</select><select required className="rounded-xl border px-3 py-3" value={productForm.brand_id} onChange={e=>setProductForm(p=>({...p,brand_id:e.target.value}))}><option value="">Seleccionar marca</option>{brands.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select><input className="rounded-xl border px-3 py-3 sm:col-span-2" placeholder="URL da imagem (opcional)" value={productForm.image_url} onChange={e=>setProductForm(p=>({...p,image_url:e.target.value}))}/></div><div className="mt-4 flex flex-wrap gap-2"><button className="rounded-xl bg-emerald-700 px-5 py-3 font-semibold text-white">{editingProduct ? "Guardar alterações" : "Guardar produto"}</button>{editingProduct&&<button type="button" onClick={cancelProductEdit} className="rounded-xl border px-5 py-3 font-semibold">Cancelar edição</button>}</div></form>
+            <form onSubmit={addProduct} className="rounded-2xl border bg-white p-5"><h3 className="font-bold">{editingProduct ? "Editar produto" : "Cadastrar produto"}</h3><div className="mt-3 grid gap-3 sm:grid-cols-2"><input required className="rounded-xl border px-3 py-3" placeholder="Código / Artigo" value={productForm.code} onChange={e=>setProductForm(p=>({...p,code:e.target.value}))}/><input required className="rounded-xl border px-3 py-3" placeholder="Nome do produto" value={productForm.name} onChange={e=>setProductForm(p=>({...p,name:e.target.value}))}/><input className="rounded-xl border px-3 py-3" placeholder="Descrição adicional" value={productForm.description} onChange={e=>setProductForm(p=>({...p,description:e.target.value}))}/><input className="rounded-xl border px-3 py-3" placeholder="Unidade (ex.: UN)" value={productForm.unit} onChange={e=>setProductForm(p=>({...p,unit:e.target.value}))}/><select className="rounded-xl border px-3 py-3" value={productForm.category_id} onChange={e=>setProductForm(p=>({...p,category_id:e.target.value}))}><option value="">Seleccionar categoria / tipo</option>{categories.map(category=><option key={category.id} value={category.id}>{category.name}</option>)}</select><select required className="rounded-xl border px-3 py-3" value={productForm.brand_id} onChange={e=>setProductForm(p=>({...p,brand_id:e.target.value}))}><option value="">Seleccionar marca</option>{brands.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select><div className="sm:col-span-2 space-y-2"><label className="block text-sm font-medium text-slate-700">Fotografia do produto (opcional)</label><input type="file" accept="image/*" className="w-full rounded-xl border px-3 py-3 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-50 file:px-3 file:py-2 file:font-semibold file:text-emerald-800" onChange={e=>setProductImageFile(e.target.files?.[0] ?? null)}/><p className="text-xs text-slate-500">Carregue uma imagem do dispositivo (máximo 5 MB).{productForm.image_url && !productImageFile ? " A fotografia actual será mantida se não escolher outra." : ""}</p>{productImageFile && <p className="text-xs text-emerald-700">Imagem seleccionada: {productImageFile.name}</p>}</div></div><div className="mt-4 flex flex-wrap gap-2"><button className="rounded-xl bg-emerald-700 px-5 py-3 font-semibold text-white">{editingProduct ? "Guardar alterações" : "Guardar produto"}</button>{editingProduct&&<button type="button" onClick={cancelProductEdit} className="rounded-xl border px-5 py-3 font-semibold">Cancelar edição</button>}</div></form>
             <div className="rounded-2xl border bg-white p-5"><h3 className="font-bold">Catálogo ({products.length})</h3><div className="mt-3 divide-y">{products.map(p=><div key={p.id} className="flex flex-wrap items-center justify-between gap-3 py-3"><div className="min-w-0 flex-1"><p className="font-semibold">{p.name}</p><p className="text-xs text-slate-500">{p.code} · {p.unit} · {brands.find(b=>b.id===p.brand_id)?.name??"Sem marca"} · {p.active?"Activo":"Inactivo"}</p></div><div className="flex flex-wrap gap-2"><button onClick={()=>startProductEdit(p)} className="rounded-lg border px-3 py-2 text-sm">Editar</button><button onClick={()=>void toggleProduct(p)} className="rounded-lg border px-3 py-2 text-sm">{p.active?"Desactivar":"Activar"}</button><button onClick={()=>void deleteProduct(p)} className="rounded-lg border border-red-200 px-3 py-2 text-sm text-red-600">Remover</button></div></div>)}</div></div></div>}
 
           {page === "companies" && isAdmin && <div className="space-y-5"><h2 className="text-2xl font-bold">Empresas</h2><div className="flex gap-2 rounded-2xl border bg-white p-4"><input className="min-w-0 flex-1 rounded-xl border px-3 py-3" placeholder="Nome da empresa" value={newCompany} onChange={e=>setNewCompany(e.target.value)}/><button onClick={()=>void addCompany()} className="rounded-xl bg-emerald-700 px-4 text-white">Cadastrar</button></div><div className="rounded-2xl border bg-white p-4 divide-y">{companies.map(company=><div key={company.id} className="flex flex-wrap items-center justify-between gap-3 py-3"><div className="min-w-0 flex-1">{editingCompany?.id===company.id?<div className="flex flex-wrap gap-2"><input autoFocus className="min-w-0 flex-1 rounded-lg border px-3 py-2" value={editedCompanyName} onChange={e=>setEditedCompanyName(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")void saveCompanyEdit();if(e.key==="Escape")setEditingCompany(null);}}/><button onClick={()=>void saveCompanyEdit()} className="rounded-lg bg-emerald-700 px-3 py-2 text-sm font-semibold text-white">Guardar</button><button onClick={()=>setEditingCompany(null)} className="rounded-lg border px-3 py-2 text-sm">Cancelar</button></div>:<><p className="font-semibold">{company.name}</p><p className="text-xs text-slate-500">{company.active?"Activa":"Inactiva"}</p></>}</div>{editingCompany?.id!==company.id&&<div className="flex flex-wrap gap-2"><button onClick={()=>{setEditingCompany(company);setEditedCompanyName(company.name);}} className="rounded-lg border px-3 py-2 text-sm">Editar</button><button onClick={()=>void toggleCompany(company)} className="rounded-lg border px-3 py-2 text-sm">{company.active?"Desactivar":"Activar"}</button><button onClick={()=>void deleteCompany(company)} className="rounded-lg border border-red-200 px-3 py-2 text-sm text-red-600">Eliminar</button></div>}</div>)}</div></div>}
