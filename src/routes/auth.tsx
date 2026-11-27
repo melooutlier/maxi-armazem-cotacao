@@ -60,7 +60,7 @@ function AuthPage() {
     }>("username-login", {
       body: {
         action: mode === "setup" ? "bootstrap" : "login",
-        username: username.trim(),
+        username,
         password,
       },
     });
