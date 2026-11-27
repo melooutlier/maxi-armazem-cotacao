@@ -56,10 +56,10 @@ Deno.serve(async (req) => {
     }
 
     if (action === "create") {
-      const username = String(body.username ?? "").trim().toLowerCase();
+      const username = String(body.username ?? "").trim();
       const password = String(body.password ?? "");
       const isAdmin = body.isAdmin === true;
-      if (!/^[a-z0-9][a-z0-9._-]{2,39}$/.test(username)) return Response.json({ error: "O nome de utilizador deve ter 3 a 40 caracteres e usar apenas letras, números, ponto, hífen ou underscore." }, { status: 400, headers: corsHeaders });
+      if (!/^[A-Za-z0-9][A-Za-z0-9._-]{2,39}$/.test(username)) return Response.json({ error: "O nome de utilizador deve ter 3 a 40 caracteres e usar apenas letras, números, ponto, hífen ou underscore." }, { status: 400, headers: corsHeaders });
       if (password.length < 8) return Response.json({ error: "A palavra-passe inicial deve ter pelo menos 8 caracteres." }, { status: 400, headers: corsHeaders });
 
       const { data: created, error: createError } = await admin.auth.admin.createUser({
@@ -87,10 +87,10 @@ Deno.serve(async (req) => {
 
     if (action === "update") {
       const userId = String(body.userId ?? "");
-      const username = String(body.username ?? "").trim().toLowerCase();
+      const username = String(body.username ?? "").trim();
       const isAdmin = body.isAdmin === true;
       const active = body.active !== false;
-      if (!userId || !/^[a-z0-9][a-z0-9._-]{2,39}$/.test(username)) return Response.json({ error: "Dados da conta inválidos." }, { status: 400, headers: corsHeaders });
+      if (!userId || !/^[A-Za-z0-9][A-Za-z0-9._-]{2,39}$/.test(username)) return Response.json({ error: "Dados da conta inválidos." }, { status: 400, headers: corsHeaders });
       if (userId === authData.user.id && (!isAdmin || !active)) return Response.json({ error: "Não pode retirar as próprias permissões administrativas nem desactivar a sua conta." }, { status: 400, headers: corsHeaders });
 
       const { data: targetRole } = await admin.from("user_roles").select("id").eq("user_id", userId).eq("role", "admin").maybeSingle();
