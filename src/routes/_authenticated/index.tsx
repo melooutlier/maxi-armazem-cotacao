@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -26,6 +26,7 @@ function Workspace() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [page, setPage] = useState<Page>("orders");
   const [loading, setLoading] = useState(true);
+  const initialized = useRef(false);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
@@ -77,7 +78,7 @@ function Workspace() {
       if (firstError) throw firstError;
       const admin = (rolesRes.data ?? []).some((r) => r.role === "admin");
       setIsAdmin(admin);
-      setPage(admin ? "dashboard" : "orders");
+      if (!initialized.current) { setPage(admin ? "dashboard" : "orders"); initialized.current = true; }
       setUsername(profileRes.data?.username ?? String(auth.user.user_metadata?.username ?? "Utilizador"));
       setCompanies(companiesRes.data ?? []);
       setProducts(productsRes.data ?? []);
