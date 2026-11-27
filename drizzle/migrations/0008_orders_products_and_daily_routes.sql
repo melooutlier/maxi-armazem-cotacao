@@ -7,6 +7,13 @@ CREATE TABLE IF NOT EXISTS public.brands (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS public.product_categories (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text NOT NULL UNIQUE,
+  description text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS public.product_families (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   brand_id uuid REFERENCES public.brands(id) ON DELETE SET NULL,
@@ -30,6 +37,11 @@ CREATE TABLE IF NOT EXISTS public.products (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+
+ALTER TABLE public.product_families ADD COLUMN IF NOT EXISTS category_id uuid REFERENCES public.product_categories(id) ON DELETE SET NULL;
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS category_id uuid REFERENCES public.product_categories(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS product_families_category_idx ON public.product_families (category_id);
+CREATE INDEX IF NOT EXISTS products_category_idx ON public.products (category_id);
 
 CREATE INDEX IF NOT EXISTS products_active_name_idx ON public.products (active, name);
 CREATE INDEX IF NOT EXISTS products_brand_idx ON public.products (brand_id);
@@ -95,6 +107,7 @@ CREATE TABLE IF NOT EXISTS public.route_visits (
 CREATE INDEX IF NOT EXISTS route_visits_route_position_idx ON public.route_visits (route_id, position);
 
 -- Enable row-level security on every new business table.
+ALTER TABLE public.product_categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.brands ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.product_families ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
@@ -102,6 +115,13 @@ ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.order_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.daily_routes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.route_visits ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Read product categories" ON public.product_categories;
+CREATE POLICY "Read product categories" ON public.product_categories FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "Admins manage product categories" ON public.product_categories;
+CREATE POLICY "Admins manage product categories" ON public.product_categories FOR ALL TO authenticated
+  USING (public.has_role(auth.uid(), 'admin'))
+  WITH CHECK (public.has_role(auth.uid(), 'admin'));
 
 -- Authenticated staff can consult active catalogue data; only administrators manage it.
 DROP POLICY IF EXISTS "Read brands" ON public.brands;
@@ -212,11 +232,11 @@ CREATE POLICY "Admins manage companies" ON public.companies FOR ALL TO authentic
   USING (public.has_role(auth.uid(), 'admin'))
   WITH CHECK (public.has_role(auth.uid(), 'admin'));
 
-GRANT SELECT ON public.brands, public.product_families TO authenticated;
+GRANT SELECT ON public.product_categories, public.brands, public.product_families TO authenticated;
 GRANT SELECT ON public.products TO authenticated;
-GRANT INSERT, UPDATE, DELETE ON public.brands, public.product_families, public.products TO authenticated;
+GRANT INSERT, UPDATE, DELETE ON public.product_categories, public.brands, public.product_families, public.products TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.orders, public.order_items TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.daily_routes, public.route_visits TO authenticated;
-GRANT ALL ON public.brands, public.product_families, public.products, public.orders, public.order_items, public.daily_routes, public.route_visits TO service_role;
+GRANT ALL ON public.product_categories, public.brands, public.product_families, public.products, public.orders, public.order_items, public.daily_routes, public.route_visits TO service_role;
 
 NOTIFY pgrst, 'reload schema';
