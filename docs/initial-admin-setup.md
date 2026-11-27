@@ -27,3 +27,11 @@ A conta recebe automaticamente os cargos de equipa e administrador. Depois da cr
 ## Atualização da base de dados
 
 Ao atualizar uma instalação existente, aplicar também a migração `0012_case_sensitive_usernames.sql` depois das migrações anteriores. Ela permite nomes de utilizador com letras maiúsculas sem alterar os nomes já guardados.
+
+## Catálogo de demonstração
+
+A migração `0014_demo_catalogue_and_brand_families.sql` adiciona dez produtos fictícios para testar a página de encomendas, com imagens de referência, marcas e categorias. Os artigos usam códigos `DEMO-001` a `DEMO-010`; não representam stock real, preços, disponibilidade comercial nem dados do Primavera.
+
+Na organização do catálogo, a marca passa a representar a família do produto. Não é necessário criar famílias separadamente. A tabela antiga `product_families` e os seus registos são preservados, mas deixam de ser usados pela interface.
+
+Aplicar esta migração depois das migrações anteriores para disponibilizar os produtos de demonstração. As imagens são carregadas a partir dos endereços externos definidos na migração.
