@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { UserRound } from "lucide-react";
+import { ShoppingCart, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
@@ -352,7 +352,7 @@ function Workspace() {
 
           {page === "orders" && <div className="space-y-5">
 
-            <div className="flex flex-wrap items-center justify-between gap-4"><div><h2 className="text-2xl font-bold">Encomendas</h2><p className="text-sm text-slate-500">Escolha os produtos e adicione-os ao carrinho para finalizar.</p></div><button onClick={()=>setCartOpen(true)} className="relative inline-flex items-center gap-3 rounded-xl bg-emerald-700 px-5 py-3 font-semibold text-white shadow-sm hover:bg-emerald-800"><span className="text-xl">🛒</span><span>Carrinho</span><span className="rounded-full bg-white px-2 py-0.5 text-sm font-bold text-emerald-800">{cart.reduce((sum,item)=>sum+item.quantity,0)}</span></button></div>
+            <div className="flex flex-wrap items-center justify-between gap-4"><div><h2 className="text-2xl font-bold">Encomendas</h2><p className="text-sm text-slate-500">Escolha os produtos e adicione-os ao carrinho para finalizar.</p></div><button onClick={()=>setCartOpen(true)} aria-label={`Abrir carrinho, ${cart.reduce((sum,item)=>sum+item.quantity,0)} unidades`} title="Abrir carrinho" className="relative grid size-12 place-items-center rounded-xl bg-emerald-700 text-white shadow-sm transition hover:bg-emerald-800"><ShoppingCart className="h-6 w-6" aria-hidden="true"/><span className="absolute -right-2 -top-2 grid min-h-6 min-w-6 place-items-center rounded-full border-2 border-white bg-white px-1 text-xs font-bold text-emerald-800">{cart.reduce((sum,item)=>sum+item.quantity,0)}</span></button></div>
             <div className="rounded-2xl border bg-white p-3 shadow-sm"><div className="relative"><span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">⌕</span><input className="w-full rounded-xl border-0 bg-slate-50 py-3 pl-11 pr-4 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-emerald-600" placeholder="Pesquisar produto (nome, código ou referência)" value={search} onChange={e=>setSearch(e.target.value)}/></div>
               <div className="mt-3 flex gap-2 overflow-x-auto pb-1"><button onClick={()=>setBrandFilter("all")} className={`shrink-0 rounded-xl px-4 py-2.5 text-sm font-semibold ${brandFilter==="all"?"bg-emerald-700 text-white":"bg-slate-100 text-slate-700 hover:bg-slate-200"}`}>Todos</button>{brands.filter(brand=>products.some(product=>product.active&&product.brand_id===brand.id)).map(brand=><button key={brand.id} onClick={()=>setBrandFilter(brand.id)} className={`shrink-0 rounded-xl px-4 py-2.5 text-sm font-semibold ${brandFilter===brand.id?"bg-emerald-700 text-white":"bg-slate-100 text-slate-700 hover:bg-slate-200"}`}>{brand.name}</button>)}</div>
             </div>
