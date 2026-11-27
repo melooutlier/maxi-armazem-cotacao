@@ -48,15 +48,15 @@ export type Database = {
         Relationships: []
       }
       product_families: {
-        Row: { id: string; brand_id: string | null; name: string; description: string | null; created_at: string }
-        Insert: { id?: string; brand_id?: string | null; name: string; description?: string | null; created_at?: string }
-        Update: { id?: string; brand_id?: string | null; name?: string; description?: string | null; created_at?: string }
+        Row: { id: string; brand_id: string | null; category_id: string | null; name: string; description: string | null; created_at: string }
+        Insert: { id?: string; brand_id?: string | null; category_id?: string | null; name: string; description?: string | null; created_at?: string }
+        Update: { id?: string; brand_id?: string | null; category_id?: string | null; name?: string; description?: string | null; created_at?: string }
         Relationships: []
       }
       products: {
-        Row: { id: string; code: string; name: string; description: string | null; brand_id: string | null; family_id: string | null; unit: string; image_url: string | null; active: boolean; sort_order: number; created_at: string; updated_at: string }
-        Insert: { id?: string; code: string; name: string; description?: string | null; brand_id?: string | null; family_id?: string | null; unit?: string; image_url?: string | null; active?: boolean; sort_order?: number; created_at?: string; updated_at?: string }
-        Update: { id?: string; code?: string; name?: string; description?: string | null; brand_id?: string | null; family_id?: string | null; unit?: string; image_url?: string | null; active?: boolean; sort_order?: number; created_at?: string; updated_at?: string }
+        Row: { id: string; code: string; name: string; description: string | null; brand_id: string | null; category_id: string | null; family_id: string | null; unit: string; image_url: string | null; active: boolean; sort_order: number; created_at: string; updated_at: string }
+        Insert: { id?: string; code: string; name: string; description?: string | null; brand_id?: string | null; category_id?: string | null; family_id?: string | null; unit?: string; image_url?: string | null; active?: boolean; sort_order?: number; created_at?: string; updated_at?: string }
+        Update: { id?: string; code?: string; name?: string; description?: string | null; brand_id?: string | null; category_id?: string | null; family_id?: string | null; unit?: string; image_url?: string | null; active?: boolean; sort_order?: number; created_at?: string; updated_at?: string }
         Relationships: []
       }
       orders: {
