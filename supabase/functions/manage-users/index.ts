@@ -56,14 +56,14 @@ Deno.serve(async (req) => {
     }
 
     if (action === "create") {
-      const username = String(body.username ?? "").trim();
+      const username = String(body.username ?? "");
       const password = String(body.password ?? "");
       const isAdmin = body.isAdmin === true;
       if (!/^[A-Za-z0-9][A-Za-z0-9._-]{2,39}$/.test(username)) return Response.json({ error: "O nome de utilizador deve ter 3 a 40 caracteres e usar apenas letras, números, ponto, hífen ou underscore." }, { status: 400, headers: corsHeaders });
       if (password.length < 8) return Response.json({ error: "A palavra-passe inicial deve ter pelo menos 8 caracteres." }, { status: 400, headers: corsHeaders });
 
       const { data: created, error: createError } = await admin.auth.admin.createUser({
-        email: username + "@users.maxi.local",
+        email: `${crypto.randomUUID()}@users.maxi.local`,
         password,
         email_confirm: true,
         user_metadata: { username, display_name: username },
