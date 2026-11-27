@@ -99,6 +99,13 @@
       "when": 1795768997682,
       "tag": "0013_case_sensitive_usernames",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1795769600000,
+      "tag": "0014_demo_catalogue_and_brand_families",
+      "breakpoints": true
     }
   ]
 }
