@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import ExcelJS from "exceljs";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
@@ -142,30 +141,12 @@ function Workspace() {
   async function exportOrder(order: Order) {
     const company = companies.find((entry) => entry.id === order.company_id);
     const items = orderItems.filter((item) => item.order_id === order.id);
-    const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet("Encomenda");
-    sheet.columns = [
-      { header: "Artigo", key: "article", width: 18 },
-      { header: "Arm.", key: "warehouse", width: 12 },
-      { header: "Localização", key: "location", width: 16 },
-      { header: "Lote", key: "lot", width: 14 },
-      { header: "Descrição", key: "description", width: 38 },
-      { header: "CIVA", key: "civa", width: 12 },
-      { header: "IVA", key: "iva", width: 12 },
-      { header: "Pr. Unit.", key: "unitPrice", width: 14 },
-      { header: "Desc.", key: "discount", width: 12 },
-      { header: "UN", key: "unit", width: 10 },
-      { header: "Qtd.", key: "quantity", width: 12 },
-      { header: "Total Liq.", key: "netTotal", width: 14 },
-      { header: "Contrato", key: "contract", width: 16 },
-    ];
-    items.forEach((item) => sheet.addRow({
-      article: item.product_code, description: item.product_name, unit: item.unit,
-      quantity: Number(item.quantity.toFixed(2)),
-    }));
-    sheet.getRow(1).font = { bold: true };
-    const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const headers = ["Artigo", "Arm.", "Localização", "Lote", "Descrição", "CIVA", "IVA", "Pr. Unit.", "Desc.", "UN", "Qtd.", "Total Liq.", "Contrato"];
+    const rows = [headers, ...items.map(item => [
+      item.product_code, "", "", "", item.product_name, "", "", "", "", item.unit,
+      Number(item.quantity.toFixed(2)), "", "",
+    ])];
+    const blob = buildXlsx(rows);
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -314,3 +295,48 @@ function Workspace() {
 function Metric({label,value}:{label:string;value:number}) { return <div className="rounded-2xl border bg-white p-5"><p className="text-sm text-slate-500">{label}</p><p className="mt-2 text-3xl font-bold">{value}</p></div>; }
 function Empty({text}:{text:string}) { return <div className="rounded-2xl border border-dashed bg-white p-10 text-center text-sm text-slate-500">{text}</div>; }
 function routeStatus(status: RouteVisit["status"]) { return ({ planned: "Planeada", in_progress: "Em curso", completed: "Concluída", not_visited: "Não realizada" } as Record<string,string>)[status] ?? status; }
+
+function buildXlsx(rows: (string | number)[][]): Blob {
+  const esc = (value: string) => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const col = (index: number) => { let n = index + 1, out = ""; while (n) { const rem = (n - 1) % 26; out = String.fromCharCode(65 + rem) + out; n = Math.floor((n - 1) / 26); } return out; };
+  const sheetRows = rows.map((row, ri) => {
+    const cells = row.map((value, ci) => {
+      const ref = `${col(ci)}${ri + 1}`;
+      if (typeof value === "number") return `<c r="${ref}"><v>${value}</v></c>`;
+      if (value === "") return "";
+      return `<c r="${ref}" t="inlineStr"><is><t xml:space="preserve">${esc(value)}</t></is></c>`;
+    }).join("");
+    return `<row r="${ri + 1}">${cells}</row>`;
+  }).join("");
+  const files: Record<string, string> = {
+    "[Content_Types].xml": '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>',
+    "_rels/.rels": '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>',
+    "xl/workbook.xml": '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Encomenda" sheetId="1" r:id="rId1"/></sheets></workbook>',
+    "xl/_rels/workbook.xml.rels": '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>',
+    "xl/worksheets/sheet1.xml": `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${sheetRows}</sheetData></worksheet>`,
+  };
+  const encoder = new TextEncoder();
+  const crc32 = (data: Uint8Array) => {
+    let crc = 0xffffffff;
+    for (const byte of data) { crc ^= byte; for (let k = 0; k < 8; k++) crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0); }
+    return (crc ^ 0xffffffff) >>> 0;
+  };
+  const local: Uint8Array[] = [], central: Uint8Array[] = [];
+  let offset = 0;
+  for (const [name, value] of Object.entries(files)) {
+    const filename = encoder.encode(name), data = encoder.encode(value), crc = crc32(data);
+    const lh = new Uint8Array(30 + filename.length + data.length), lv = new DataView(lh.buffer);
+    lv.setUint32(0, 0x04034b50, true); lv.setUint16(4, 20, true); lv.setUint16(6, 0x800, true); lv.setUint16(8, 0, true);
+    lv.setUint32(14, crc, true); lv.setUint32(18, data.length, true); lv.setUint32(22, data.length, true); lv.setUint16(26, filename.length, true);
+    lh.set(filename, 30); lh.set(data, 30 + filename.length); local.push(lh);
+    const ch = new Uint8Array(46 + filename.length), cv = new DataView(ch.buffer);
+    cv.setUint32(0, 0x02014b50, true); cv.setUint16(4, 20, true); cv.setUint16(6, 20, true); cv.setUint16(8, 0x800, true); cv.setUint16(10, 0, true);
+    cv.setUint32(16, crc, true); cv.setUint32(20, data.length, true); cv.setUint32(24, data.length, true); cv.setUint16(28, filename.length, true); cv.setUint32(42, offset, true);
+    ch.set(filename, 46); central.push(ch); offset += lh.length;
+  }
+  const centralSize = central.reduce((sum, part) => sum + part.length, 0);
+  const end = new Uint8Array(22), ev = new DataView(end.buffer);
+  ev.setUint32(0, 0x06054b50, true); ev.setUint16(8, central.length, true); ev.setUint16(10, central.length, true);
+  ev.setUint32(12, centralSize, true); ev.setUint32(16, offset, true);
+  return new Blob([...local, ...central, end], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+}
