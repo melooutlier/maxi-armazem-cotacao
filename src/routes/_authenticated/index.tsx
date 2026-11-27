@@ -74,7 +74,7 @@ function Workspace() {
     setLoading(true);
     try {
       const { data: auth } = await supabase.auth.getUser();
-      if (!auth.user) { window.location.assign("/auth"); return; }
+      if (!auth.user) { window.location.assign("/welcome"); return; }
       setUserId(auth.user.id);
       const [profileRes, rolesRes, companiesRes, productsRes, brandsRes, categoriesRes, ordersRes, itemsRes, routesRes, routeVisitsRes] = await Promise.all([
         supabase.from("user_profiles").select("username").eq("user_id", auth.user.id).maybeSingle(),
