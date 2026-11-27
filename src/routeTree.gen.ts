@@ -56,7 +56,7 @@ export interface FileRouteTypes {
   fullPaths: '/' | '/auth' | '/welcome'
   fileRoutesByTo: FileRoutesByTo
   to: '/auth' | '/' | '/welcome'
-  id: '__root__' | '/_authenticated' | '/auth' | '/_authenticated/'
+  id: '__root__' | '/_authenticated' | '/auth' | '/welcome' | '/_authenticated/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -72,6 +72,13 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/welcome': {
+      id: '/welcome'
+      path: '/welcome'
+      fullPath: '/welcome'
+      preLoaderRoute: typeof WelcomeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth': {
