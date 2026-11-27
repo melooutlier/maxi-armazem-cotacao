@@ -85,6 +85,13 @@
       "when": 1795765778237,
       "tag": "0011_restrict_catalogue_read_to_staff",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1795766400000,
+      "tag": "0012_case_sensitive_usernames",
+      "breakpoints": true
     }
   ]
 }
