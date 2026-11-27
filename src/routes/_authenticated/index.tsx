@@ -67,6 +67,7 @@ function Workspace() {
   const [newUserAdmin, setNewUserAdmin] = useState(false);
   const [editingUser, setEditingUser] = useState<AppUser | null>(null);
   const [historyFilter, setHistoryFilter] = useState("all");
+  const [confirmation, setConfirmation] = useState<{ message: string; action: () => Promise<void> | void } | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -218,13 +219,11 @@ function Workspace() {
   }
 
   async function deleteCompany(company: Company) {
-    if (!window.confirm(`Tem a certeza de que pretende eliminar a empresa "${company.name}"? Esta acção não pode ser desfeita.`)) return;
-    const { error } = await supabase.from("companies").delete().eq("id", company.id);
-    if (error) {
-      toast.error(error.message.includes("companies") || error.code === "23503"
-        ? "Não é possível eliminar esta empresa porque já está associada a encomendas ou rotas. Pode desactivá-la."
-        : error.message);
-    } else { toast.success("Empresa eliminada."); await loadData(); }
+    setConfirmation({ message: "Tem a certeza de que pretende eliminar a empresa \"" + company.name + "\"? Esta acção não pode ser desfeita.", action: async () => {
+      const { error } = await supabase.from("companies").delete().eq("id", company.id);
+      if (error) toast.error(error.message.includes("companies") || error.code === "23503" ? "Não é possível eliminar esta empresa porque já está associada a encomendas ou rotas. Pode desactivá-la." : error.message);
+      else { toast.success("Empresa eliminada."); await loadData(); }
+    }});
   }
 
   async function addBrand() {
@@ -275,10 +274,11 @@ function Workspace() {
   }
 
   async function deleteProduct(product: Product) {
-    if (!window.confirm(`Tem a certeza de que pretende remover "${product.name}" do catálogo? Os registos das encomendas antigas serão preservados.`)) return;
-    const { error } = await supabase.from("products").delete().eq("id", product.id);
-    if (error) toast.error(error.message);
-    else { if (editingProduct?.id === product.id) cancelProductEdit(); toast.success("Produto removido do catálogo."); await loadData(); }
+    setConfirmation({ message: "Tem a certeza de que pretende remover \"" + product.name + "\" do catálogo? Os registos das encomendas antigas serão preservados.", action: async () => {
+      const { error } = await supabase.from("products").delete().eq("id", product.id);
+      if (error) toast.error(error.message);
+      else { if (editingProduct?.id === product.id) cancelProductEdit(); toast.success("Produto removido do catálogo."); await loadData(); }
+    }});
   }
 
   async function updateOrderStatus(order: Order, status: Order["status"]) {
@@ -351,6 +351,16 @@ function Workspace() {
           {page === "history" && <div className="space-y-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-2xl font-bold">{isAdmin?"Histórico e relatórios":"Histórico"}</h2><p className="text-sm text-slate-500">{isAdmin?"Consulte todas as encomendas do sistema.":"Consulte as suas encomendas anteriores."}</p></div><select className="rounded-xl border bg-white px-3 py-2" value={historyFilter} onChange={e=>setHistoryFilter(e.target.value)}><option value="all">Todos os estados</option><option value="submitted">Submetida</option><option value="processing">Em processamento</option><option value="completed">Concluída</option><option value="cancelled">Cancelada</option></select></div><div className="space-y-3">{reportOrders.map(order=><article key={order.id} className="rounded-2xl border bg-white p-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="font-bold">{companies.find(c=>c.id===order.company_id)?.name ?? "Empresa"}</p><p className="text-xs text-slate-500">{new Date(order.created_at).toLocaleString("pt-MZ")} · {orderItems.filter(i=>i.order_id===order.id).length} produtos</p></div><div className="flex items-center gap-2"><span className="rounded-full bg-slate-100 px-3 py-1 text-xs">{order.status}</span><button onClick={()=>void exportOrder(order)} className="rounded-lg border px-3 py-2 text-sm font-semibold">Exportar Excel</button></div></div><div className="mt-3 divide-y">{orderItems.filter(i=>i.order_id===order.id).map(item=><div key={item.id} className="flex justify-between gap-3 py-2 text-sm"><span>{item.product_code} · {item.product_name}</span><span className="font-semibold">{item.quantity.toFixed(2).replace(".",",")} {item.unit}</span></div>)}</div></article>)}{!reportOrders.length&&<Empty text="Ainda não existem encomendas neste histórico."/>}</div></div>}
         </section>
       </div>
+      {confirmation && <div className="fixed inset-0 z-[100] grid place-items-center bg-slate-950/50 px-4 py-6" role="presentation">
+        <section role="alertdialog" aria-modal="true" aria-labelledby="confirmation-title" className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+          <h2 id="confirmation-title" className="text-center text-lg font-bold text-slate-900">Confirmar acção</h2>
+          <p className="mt-3 text-center text-sm leading-6 text-slate-600">{confirmation.message}</p>
+          <div className="mt-6 flex justify-center gap-3">
+            <button type="button" onClick={() => setConfirmation(null)} className="rounded-xl border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-700">Cancelar</button>
+            <button type="button" onClick={() => { const action = confirmation.action; setConfirmation(null); void action(); }} className="rounded-xl bg-red-600 px-5 py-2.5 text-sm font-semibold text-white">Confirmar</button>
+          </div>
+        </section>
+      </div>}
     </main>
   );
 }
