@@ -8,7 +8,6 @@ type Company = Tables<"companies">;
 type Product = Tables<"products">;
 type Brand = Tables<"brands">;
 type Category = Tables<"product_categories">;
-type Family = Tables<"product_families">;
 type Order = Tables<"orders">;
 type OrderItem = Tables<"order_items">;
 type DailyRoute = Tables<"daily_routes">;
@@ -38,7 +37,6 @@ function Workspace() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
-  const [families, setFamilies] = useState<Family[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
@@ -48,7 +46,6 @@ function Workspace() {
   const [search, setSearch] = useState("");
   const [brandFilter, setBrandFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
-  const [familyFilter, setFamilyFilter] = useState("all");
   const [cart, setCart] = useState<{ product: Product; quantity: number }[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
   const [catalogView, setCatalogView] = useState<"grid" | "list">("grid");
@@ -60,11 +57,8 @@ function Workspace() {
   const [routeCompanyIds, setRouteCompanyIds] = useState<string[]>([]);
   const [newCompany, setNewCompany] = useState("");
   const [newBrand, setNewBrand] = useState("");
-  const [newFamily, setNewFamily] = useState("");
   const [newCategory, setNewCategory] = useState("");
-  const [familyCategory, setFamilyCategory] = useState("");
-  const [familyBrand, setFamilyBrand] = useState("");
-  const [productForm, setProductForm] = useState({ code: "", name: "", description: "", unit: "UN", brand_id: "", category_id: "", family_id: "", image_url: "" });
+  const [productForm, setProductForm] = useState({ code: "", name: "", description: "", unit: "UN", brand_id: "", category_id: "", image_url: "" });
   const [newUsername, setNewUsername] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newUserAdmin, setNewUserAdmin] = useState(false);
@@ -77,20 +71,19 @@ function Workspace() {
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) { window.location.assign("/auth"); return; }
       setUserId(auth.user.id);
-      const [profileRes, rolesRes, companiesRes, productsRes, brandsRes, familiesRes, categoriesRes, ordersRes, itemsRes, routesRes, routeVisitsRes] = await Promise.all([
+      const [profileRes, rolesRes, companiesRes, productsRes, brandsRes, categoriesRes, ordersRes, itemsRes, routesRes, routeVisitsRes] = await Promise.all([
         supabase.from("user_profiles").select("username").eq("user_id", auth.user.id).maybeSingle(),
         supabase.from("user_roles").select("role").eq("user_id", auth.user.id),
         supabase.from("companies").select("*").order("name"),
         supabase.from("products").select("*").order("sort_order").order("name"),
         supabase.from("brands").select("*").order("name"),
-        supabase.from("product_families").select("*").order("name"),
         supabase.from("product_categories").select("*").order("name"),
         supabase.from("orders").select("*").order("created_at", { ascending: false }),
         supabase.from("order_items").select("*").order("created_at"),
         supabase.from("daily_routes").select("*").order("route_date", { ascending: false }),
         supabase.from("route_visits").select("*").order("position"),
       ]);
-      const firstError = [profileRes.error, rolesRes.error, companiesRes.error, productsRes.error, brandsRes.error, familiesRes.error, categoriesRes.error, ordersRes.error, itemsRes.error, routesRes.error, routeVisitsRes.error].find(Boolean);
+      const firstError = [profileRes.error, rolesRes.error, companiesRes.error, productsRes.error, brandsRes.error, categoriesRes.error, ordersRes.error, itemsRes.error, routesRes.error, routeVisitsRes.error].find(Boolean);
       if (firstError) throw firstError;
       const admin = (rolesRes.data ?? []).some((r) => r.role === "admin");
       setIsAdmin(admin);
@@ -99,7 +92,6 @@ function Workspace() {
       setCompanies(companiesRes.data ?? []);
       setProducts(productsRes.data ?? []);
       setBrands(brandsRes.data ?? []);
-      setFamilies(familiesRes.data ?? []);
       setCategories(categoriesRes.data ?? []);
       setOrders(ordersRes.data ?? []);
       setOrderItems(itemsRes.data ?? []);
@@ -123,9 +115,8 @@ function Workspace() {
     return product.active &&
       (!term || `${product.code} ${product.name} ${product.description ?? ""}`.toLocaleLowerCase("pt-MZ").includes(term)) &&
       (brandFilter === "all" || product.brand_id === brandFilter) &&
-      (familyFilter === "all" || product.family_id === familyFilter) &&
       (categoryFilter === "all" || product.category_id === categoryFilter);
-  }), [products, search, brandFilter, familyFilter, categoryFilter]);
+  }), [products, search, brandFilter, categoryFilter]);
 
   function addToCart(product: Product) {
     setCart((current) => {
@@ -228,20 +219,14 @@ function Workspace() {
     if (error) toast.error(error.message); else { setNewCategory(""); await loadData(); }
   }
 
-  async function addFamily() {
-    if (!newFamily.trim()) return;
-    const { error } = await supabase.from("product_families").insert({ name: newFamily.trim(), brand_id: familyBrand || null, category_id: familyCategory || null });
-    if (error) toast.error(error.message); else { setNewFamily(""); await loadData(); }
-  }
-
   async function addProduct(event: FormEvent) {
     event.preventDefault();
     const { error } = await supabase.from("products").insert({
-      ...productForm, brand_id: productForm.brand_id || null, category_id: productForm.category_id || null, family_id: productForm.family_id || null,
+      ...productForm, brand_id: productForm.brand_id || null, category_id: productForm.category_id || null,
       image_url: productForm.image_url || null, description: productForm.description || null,
     });
     if (error) toast.error(error.message); else {
-      setProductForm({ code: "", name: "", description: "", unit: "UN", brand_id: "", category_id: "", family_id: "", image_url: "" });
+      setProductForm({ code: "", name: "", description: "", unit: "UN", brand_id: "", category_id: "", image_url: "" });
       await loadData(); toast.success("Produto adicionado ao catálogo.");
     }
   }
@@ -310,8 +295,8 @@ function Workspace() {
             {routes.filter(r=>r.route_date===routeDate&&(isAdmin||r.assigned_user_id===userId)).map(route=><div key={route.id} className="rounded-2xl border bg-white p-5"><div className="flex flex-wrap justify-between gap-2"><h3 className="font-bold">Rota de {route.route_date}</h3><span className="text-xs text-slate-500">Responsável: {users.find(u=>u.id===route.assigned_user_id)?.username ?? (route.assigned_user_id===userId?username:"Utilizador atribuído")}</span></div><div className="mt-4 space-y-3">{routeVisits.filter(v=>v.route_id===route.id).sort((a,b)=>a.position-b.position).map((visit,index)=><div key={visit.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3"><div><p className="text-xs text-slate-400">Paragem {index+1}</p><p className="font-semibold">{companies.find(c=>c.id===visit.company_id)?.name ?? "Empresa"}</p><p className="text-xs text-slate-500">{routeStatus(visit.status)}</p></div>{(isAdmin||route.assigned_user_id===userId)&&<select className="rounded-lg border px-3 py-2 text-sm" value={visit.status} onChange={e=>void updateRouteVisit(visit,e.target.value as RouteVisit["status"])}><option value="planned">Planeada</option><option value="in_progress">Em curso</option><option value="completed">Concluída</option><option value="not_visited">Não realizada</option></select>}</div>)}</div></div>)}
             {!routes.some(r=>r.route_date===routeDate&&(isAdmin||r.assigned_user_id===userId))&&<Empty text="Não existe uma rota atribuída para esta data."/>}</div>}
 
-          {page === "catalog" && isAdmin && <div className="space-y-5"><h2 className="text-2xl font-bold">Produtos e famílias</h2><div className="grid gap-4 lg:grid-cols-3"><div className="rounded-2xl border bg-white p-5"><h3 className="font-bold">Categorias / tipos</h3><div className="mt-3 flex gap-2"><input className="min-w-0 flex-1 rounded-xl border px-3 py-2" placeholder="Nome da categoria" value={newCategory} onChange={e=>setNewCategory(e.target.value)}/><button onClick={()=>void addCategory()} className="rounded-xl bg-emerald-700 px-4 text-white">Adicionar</button></div><div className="mt-3 flex flex-wrap gap-2">{categories.map(category=><span key={category.id} className="rounded-full bg-slate-100 px-3 py-1 text-sm">{category.name}</span>)}</div></div><div className="rounded-2xl border bg-white p-5"><h3 className="font-bold">Marcas</h3><div className="mt-3 flex gap-2"><input className="min-w-0 flex-1 rounded-xl border px-3 py-2" placeholder="Nome da marca" value={newBrand} onChange={e=>setNewBrand(e.target.value)}/><button onClick={()=>void addBrand()} className="rounded-xl bg-emerald-700 px-4 text-white">Adicionar</button></div><div className="mt-3 flex flex-wrap gap-2">{brands.map(b=><span key={b.id} className="rounded-full bg-slate-100 px-3 py-1 text-sm">{b.name}</span>)}</div></div><div className="rounded-2xl border bg-white p-5"><h3 className="font-bold">Famílias</h3><div className="mt-3 grid gap-2"><input className="rounded-xl border px-3 py-2" placeholder="Nome da família" value={newFamily} onChange={e=>setNewFamily(e.target.value)}/><select className="rounded-xl border px-3 py-2" value={familyCategory} onChange={e=>setFamilyCategory(e.target.value)}><option value="">Sem categoria associada</option>{categories.map(category=><option key={category.id} value={category.id}>{category.name}</option>)}</select><select className="rounded-xl border px-3 py-2" value={familyBrand} onChange={e=>setFamilyBrand(e.target.value)}><option value="">Sem marca associada</option>{brands.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select><button onClick={()=>void addFamily()} className="rounded-xl bg-emerald-700 px-4 py-2 text-white">Adicionar família</button></div><div className="mt-3 flex flex-wrap gap-2">{families.map(f=><span key={f.id} className="rounded-full bg-slate-100 px-3 py-1 text-sm">{f.name}</span>)}</div></div></div>
-            <form onSubmit={addProduct} className="rounded-2xl border bg-white p-5"><h3 className="font-bold">Cadastrar produto</h3><div className="mt-3 grid gap-3 sm:grid-cols-2"><input required className="rounded-xl border px-3 py-3" placeholder="Código / Artigo" value={productForm.code} onChange={e=>setProductForm(p=>({...p,code:e.target.value}))}/><input required className="rounded-xl border px-3 py-3" placeholder="Nome do produto" value={productForm.name} onChange={e=>setProductForm(p=>({...p,name:e.target.value}))}/><input className="rounded-xl border px-3 py-3" placeholder="Descrição adicional" value={productForm.description} onChange={e=>setProductForm(p=>({...p,description:e.target.value}))}/><input className="rounded-xl border px-3 py-3" placeholder="Unidade (ex.: UN)" value={productForm.unit} onChange={e=>setProductForm(p=>({...p,unit:e.target.value}))}/><select className="rounded-xl border px-3 py-3" value={productForm.category_id} onChange={e=>setProductForm(p=>({...p,category_id:e.target.value}))}><option value="">Seleccionar categoria / tipo</option>{categories.map(category=><option key={category.id} value={category.id}>{category.name}</option>)}</select><select className="rounded-xl border px-3 py-3" value={productForm.brand_id} onChange={e=>setProductForm(p=>({...p,brand_id:e.target.value}))}><option value="">Seleccionar marca</option>{brands.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select><select className="rounded-xl border px-3 py-3" value={productForm.family_id} onChange={e=>setProductForm(p=>({...p,family_id:e.target.value}))}><option value="">Seleccionar família</option>{families.map(f=><option key={f.id} value={f.id}>{f.name}</option>)}</select><input className="rounded-xl border px-3 py-3 sm:col-span-2" placeholder="URL da imagem (opcional)" value={productForm.image_url} onChange={e=>setProductForm(p=>({...p,image_url:e.target.value}))}/></div><button className="mt-4 rounded-xl bg-emerald-700 px-5 py-3 font-semibold text-white">Guardar produto</button></form>
+          {page === "catalog" && isAdmin && <div className="space-y-5"><h2 className="text-2xl font-bold">Produtos e marcas</h2><div className="grid gap-4 lg:grid-cols-3"><div className="rounded-2xl border bg-white p-5"><h3 className="font-bold">Categorias / tipos</h3><div className="mt-3 flex gap-2"><input className="min-w-0 flex-1 rounded-xl border px-3 py-2" placeholder="Nome da categoria" value={newCategory} onChange={e=>setNewCategory(e.target.value)}/><button onClick={()=>void addCategory()} className="rounded-xl bg-emerald-700 px-4 text-white">Adicionar</button></div><div className="mt-3 flex flex-wrap gap-2">{categories.map(category=><span key={category.id} className="rounded-full bg-slate-100 px-3 py-1 text-sm">{category.name}</span>)}</div></div><div className="rounded-2xl border bg-white p-5"><h3 className="font-bold">Marcas</h3><div className="mt-3 flex gap-2"><input className="min-w-0 flex-1 rounded-xl border px-3 py-2" placeholder="Nome da marca" value={newBrand} onChange={e=>setNewBrand(e.target.value)}/><button onClick={()=>void addBrand()} className="rounded-xl bg-emerald-700 px-4 text-white">Adicionar</button></div><div className="mt-3 flex flex-wrap gap-2">{brands.map(b=><span key={b.id} className="rounded-full bg-slate-100 px-3 py-1 text-sm">{b.name}</span>)}</div></div></div></div>
+            <form onSubmit={addProduct} className="rounded-2xl border bg-white p-5"><h3 className="font-bold">Cadastrar produto</h3><div className="mt-3 grid gap-3 sm:grid-cols-2"><input required className="rounded-xl border px-3 py-3" placeholder="Código / Artigo" value={productForm.code} onChange={e=>setProductForm(p=>({...p,code:e.target.value}))}/><input required className="rounded-xl border px-3 py-3" placeholder="Nome do produto" value={productForm.name} onChange={e=>setProductForm(p=>({...p,name:e.target.value}))}/><input className="rounded-xl border px-3 py-3" placeholder="Descrição adicional" value={productForm.description} onChange={e=>setProductForm(p=>({...p,description:e.target.value}))}/><input className="rounded-xl border px-3 py-3" placeholder="Unidade (ex.: UN)" value={productForm.unit} onChange={e=>setProductForm(p=>({...p,unit:e.target.value}))}/><select className="rounded-xl border px-3 py-3" value={productForm.category_id} onChange={e=>setProductForm(p=>({...p,category_id:e.target.value}))}><option value="">Seleccionar categoria / tipo</option>{categories.map(category=><option key={category.id} value={category.id}>{category.name}</option>)}</select><select className="rounded-xl border px-3 py-3" value={productForm.brand_id} onChange={e=>setProductForm(p=>({...p,brand_id:e.target.value}))}><option value="">Seleccionar marca</option>{brands.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select><input className="rounded-xl border px-3 py-3 sm:col-span-2" placeholder="URL da imagem (opcional)" value={productForm.image_url} onChange={e=>setProductForm(p=>({...p,image_url:e.target.value}))}/></div><button className="mt-4 rounded-xl bg-emerald-700 px-5 py-3 font-semibold text-white">Guardar produto</button></form>
             <div className="rounded-2xl border bg-white p-5"><h3 className="font-bold">Catálogo ({products.length})</h3><div className="mt-3 divide-y">{products.map(p=><div key={p.id} className="flex flex-wrap items-center justify-between gap-3 py-3"><div><p className="font-semibold">{p.name}</p><p className="text-xs text-slate-500">{p.code} · {p.unit}</p></div><button onClick={()=>void toggleProduct(p)} className="rounded-lg border px-3 py-2 text-sm">{p.active?"Desactivar":"Activar"}</button></div>)}</div></div></div>}
 
           {page === "companies" && isAdmin && <div className="space-y-5"><h2 className="text-2xl font-bold">Empresas</h2><div className="flex gap-2 rounded-2xl border bg-white p-4"><input className="min-w-0 flex-1 rounded-xl border px-3 py-3" placeholder="Nome da empresa" value={newCompany} onChange={e=>setNewCompany(e.target.value)}/><button onClick={()=>void addCompany()} className="rounded-xl bg-emerald-700 px-4 text-white">Cadastrar</button></div><div className="rounded-2xl border bg-white p-4 divide-y">{companies.map(c=><div key={c.id} className="flex items-center justify-between gap-3 py-3"><div><p className="font-semibold">{c.name}</p><p className="text-xs text-slate-500">{c.active?"Activa":"Inactiva"}</p></div><button onClick={()=>void toggleCompany(c)} className="rounded-lg border px-3 py-2 text-sm">{c.active?"Desactivar":"Activar"}</button></div>)}</div></div>}
