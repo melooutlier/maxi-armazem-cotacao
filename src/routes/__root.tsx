@@ -83,10 +83,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "NESPECTIONA | Gestão de operações" },
+      { title: "NESPECTION | Gestão de operações" },
       { name: "description", content: "Sistema de gestão de encomendas, empresas e rotas." },
       { name: "author", content: "Lovable" },
-      { property: "og:title", content: "NESPECTIONA | Gestão de operações" },
+      { property: "og:title", content: "NESPECTION | Gestão de operações" },
       { property: "og:description", content: "Operação de campo e reposição da Maxi Armazém em Maputo." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
