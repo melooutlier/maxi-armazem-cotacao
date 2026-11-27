@@ -14,7 +14,7 @@ type OrderItem = Tables<"order_items">;
 type DailyRoute = Tables<"daily_routes">;
 type RouteVisit = Tables<"route_visits">;
 type AppUser = { id: string; username: string; isAdmin: boolean; active: boolean; createdAt: string };
-type Page = "dashboard" | "orders" | "routes" | "catalog" | "companies" | "users" | "history";
+type Page = "home" | "dashboard" | "orders" | "routes" | "catalog" | "companies" | "users" | "history";
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({ meta: [{ title: "Maxi Armazém | Encomendas e Rotas" }] }),
@@ -25,7 +25,7 @@ function Workspace() {
   const [userId, setUserId] = useState("");
   const [username, setUsername] = useState("Utilizador");
   const [isAdmin, setIsAdmin] = useState(false);
-  const [page, setPage] = useState<Page>("orders");
+  const [page, setPage] = useState<Page>("home");
   const [loading, setLoading] = useState(true);
   const initialized = useRef(false);
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -84,7 +84,7 @@ function Workspace() {
       if (firstError) throw firstError;
       const admin = (rolesRes.data ?? []).some((r) => r.role === "admin");
       setIsAdmin(admin);
-      if (!initialized.current) { setPage(admin ? "dashboard" : "orders"); initialized.current = true; }
+      if (!initialized.current) { setPage("home"); initialized.current = true; }
       setUsername(profileRes.data?.username ?? String(auth.user.user_metadata?.["username"] ?? "Utilizador"));
       setCompanies(companiesRes.data ?? []);
       setProducts(productsRes.data ?? []);
@@ -277,11 +277,10 @@ function Workspace() {
           <div className="flex items-center gap-3 text-sm"><span className="rounded-full bg-slate-100 px-3 py-2">{username} · {isAdmin ? "Administrador" : "Utilizador"}</span><button className="rounded-lg border px-3 py-2 hover:bg-slate-50" onClick={() => void supabase.auth.signOut().then(() => window.location.assign("/auth"))}>Sair</button></div>
         </div>
       </header>
-      <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 lg:grid-cols-[230px_minmax(0,1fr)]">
-        <aside className="h-fit rounded-2xl border bg-white p-3">
-          <nav className="grid gap-1">{nav.map((item) => <button key={item.id} onClick={() => setPage(item.id)} className={`rounded-xl px-3 py-3 text-left text-sm font-medium ${page === item.id ? "bg-emerald-700 text-white" : "text-slate-700 hover:bg-slate-100"}`}>{item.label}</button>)}</nav>
-        </aside>
+      <div className="mx-auto max-w-7xl px-4 py-8">
         <section className="min-w-0">
+          {page !== "home" && <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><button onClick={() => setPage("home")} className="inline-flex items-center gap-2 rounded-xl border bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">← Menu principal</button><span className="text-sm text-slate-500">{username} · {isAdmin ? "Administrador" : "Utilizador"}</span></div>}
+          {page === "home" && <div className="mx-auto max-w-5xl py-8"><div className="mb-8 text-center"><h2 className="text-3xl font-bold tracking-tight">Menu principal</h2><p className="mt-2 text-slate-500">Seleccione a área que pretende abrir.</p></div><div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">{nav.map((item) => <button key={item.id} onClick={() => setPage(item.id)} className="group flex min-h-44 flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-7 text-center shadow-sm transition hover:-translate-y-1 hover:border-emerald-600 hover:shadow-md"><span className="mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-emerald-50 text-2xl font-bold text-emerald-700">{({dashboard:"▦",orders:"▤",routes:"⌖",catalog:"▧",companies:"⌂",users:"♙",history:"◷"} as Record<string,string>)[item.id]}</span><span className="text-lg font-semibold text-slate-900">{item.label}</span><span className="mt-2 text-sm text-slate-500">Abrir secção</span></button>)}</div></div>}
           {page === "dashboard" && isAdmin && <div className="space-y-5"><h2 className="text-2xl font-bold">Painel de controlo</h2><div className="grid gap-4 sm:grid-cols-3"><Metric label="Encomendas" value={orders.length}/><Metric label="Produtos activos" value={products.filter(p=>p.active).length}/><Metric label="Empresas activas" value={activeCompanies.length}/></div><div className="rounded-2xl border bg-white p-5"><h3 className="font-semibold">Operação</h3><p className="mt-2 text-sm text-slate-600">Acompanhe encomendas, atribua rotas diárias e mantenha o catálogo actualizado.</p></div></div>}
 
           {page === "orders" && <div className="space-y-5">{isAdmin && <div className="rounded-2xl border bg-white p-5"><h3 className="font-bold">Encomendas recebidas</h3><div className="mt-3 divide-y">{orders.filter(o=>o.status!=="completed"&&o.status!=="cancelled").map(order=><div key={order.id} className="flex flex-wrap items-center justify-between gap-3 py-3"><div><p className="font-semibold">{companies.find(c=>c.id===order.company_id)?.name ?? "Empresa"}</p><p className="text-xs text-slate-500">{new Date(order.created_at).toLocaleString("pt-MZ")} · {users.find(u=>u.id===order.created_by)?.username ?? (order.created_by===userId?username:"Utilizador")} · {orderItems.filter(i=>i.order_id===order.id).length} produtos</p></div><select className="rounded-lg border px-3 py-2 text-sm" value={order.status} onChange={e=>void updateOrderStatus(order,e.target.value as Order["status"])}><option value="draft">Rascunho</option><option value="submitted">Submetida</option><option value="processing">Em processamento</option><option value="completed">Concluída</option><option value="cancelled">Cancelada</option></select></div>)}{!orders.some(o=>o.status!=="completed"&&o.status!=="cancelled")&&<p className="py-4 text-sm text-slate-500">Não existem encomendas pendentes.</p>}</div></div>}<div className="flex flex-wrap items-end justify-between gap-3"><div><h2 className="text-2xl font-bold">Encomendas</h2><p className="text-sm text-slate-500">Escolha produtos, ajuste quantidades e finalize para uma empresa.</p></div><div className="rounded-full bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">{cart.reduce((sum,item)=>sum+item.quantity,0)} unidades no carrinho</div></div>
