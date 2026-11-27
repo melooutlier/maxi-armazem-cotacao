@@ -73,10 +73,11 @@ function Workspace() {
         supabase.from("daily_routes").select("*").order("route_date", { ascending: false }),
         supabase.from("route_visits").select("*").order("position"),
       ]);
-      const firstError = [companiesRes.error, productsRes.error, brandsRes.error, familiesRes.error, ordersRes.error, itemsRes.error, routesRes.error, routeVisitsRes.error].find(Boolean);
+      const firstError = [profileRes.error, rolesRes.error, companiesRes.error, productsRes.error, brandsRes.error, familiesRes.error, ordersRes.error, itemsRes.error, routesRes.error, routeVisitsRes.error].find(Boolean);
       if (firstError) throw firstError;
       const admin = (rolesRes.data ?? []).some((r) => r.role === "admin");
       setIsAdmin(admin);
+      setPage(admin ? "dashboard" : "orders");
       setUsername(profileRes.data?.username ?? String(auth.user.user_metadata?.username ?? "Utilizador"));
       setCompanies(companiesRes.data ?? []);
       setProducts(productsRes.data ?? []);
@@ -144,7 +145,7 @@ function Workspace() {
     const headers = ["Artigo", "Arm.", "Localização", "Lote", "Descrição", "CIVA", "IVA", "Pr. Unit.", "Desc.", "UN", "Qtd.", "Total Liq.", "Contrato"];
     const rows = [headers, ...items.map(item => [
       item.product_code, "", "", "", item.product_name, "", "", "", "", item.unit,
-      Number(item.quantity.toFixed(2)), "", "",
+      item.quantity.toFixed(2).replace(".", ","), "", "",
     ])];
     const blob = buildXlsx(rows);
     const url = URL.createObjectURL(blob);
@@ -243,7 +244,6 @@ function Workspace() {
 
   const visibleOrders = orders.filter((order) => isAdmin || order.created_by === userId);
   const reportOrders = visibleOrders.filter((order) => historyFilter === "all" || order.status === historyFilter);
-  const todayRoute = routes.find((route) => route.route_date === routeDate && (isAdmin || route.assigned_user_id === userId));
   const nav: { id: Page; label: string }[] = isAdmin
     ? [{ id: "dashboard", label: "Painel de controlo" }, { id: "orders", label: "Encomendas" }, { id: "routes", label: "Rotas" }, { id: "catalog", label: "Produtos e famílias" }, { id: "companies", label: "Empresas" }, { id: "users", label: "Utilizadores" }, { id: "history", label: "Histórico e relatórios" }]
     : [{ id: "orders", label: "Encomendas" }, { id: "routes", label: "Rotas" }, { id: "history", label: "Histórico" }];
