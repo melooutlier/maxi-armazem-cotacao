@@ -92,6 +92,13 @@
       "when": 1795766400000,
       "tag": "0012_case_sensitive_usernames",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1795768997682,
+      "tag": "0013_case_sensitive_usernames",
+      "breakpoints": true
     }
   ]
 }

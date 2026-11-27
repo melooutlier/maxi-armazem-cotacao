@@ -31,3 +31,5 @@ use the editor.
 
 ## Application architecture
 - Keep shared inspection state in Lovable Cloud `visits` and `visit_items` tables, visible only to signed-in staff so the team can coordinate without exposing records publicly.
+- Use TanStack server functions for username authentication, with server-only privileged lookup and the existing Auth hash verifier; shared schemas reject transformed or overlong credentials before session creation.
+- Keep the atomic first-administrator database claim and provider throttling; do not replace either with client checks or in-memory state.

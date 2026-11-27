@@ -20,6 +20,9 @@ A conta recebe automaticamente os cargos de equipa e administrador. Depois da cr
 - Não ativar registo público de contas.
 - A criação do primeiro administrador é validada novamente no servidor e na base de dados, impedindo que outra pessoa use o mesmo atalho depois da configuração inicial.
 - Recomenda-se uma palavra-passe forte e exclusiva.
+- O login não modifica espaços, maiúsculas, acentos ou símbolos. As palavras-passe são verificadas pelo serviço de autenticação, sem comparação parcial.
+- O máximo aceite é 72 bytes UTF-8 (acentos e símbolos podem ocupar vários bytes), para impedir que o mecanismo de hash ignore um sufixo. Uma conta antiga com uma palavra-passe acima desse limite necessita de redefinição pelo administrador.
+- A proteção contra tentativas repetidas continua a ser a do serviço de autenticação; não foi acrescentado um bloqueio personalizado.
 
 ## Atualização da base de dados
 

@@ -5,6 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { canCreateFirstAdmin } from "@/lib/first-admin";
+import { useServerFn } from "@tanstack/react-start";
+import { loginStatus, usernameLogin } from "@/lib/username-login.functions";
+import { INVALID_CREDENTIALS, loginCredentialsSchema, setupCredentialsSchema } from "@/lib/login-credentials";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -24,6 +27,8 @@ type AuthMode = "login" | "setup";
 
 function AuthPage() {
   const navigate = useNavigate();
+  const login = useServerFn(usernameLogin);
+  const getStatus = useServerFn(loginStatus);
   const [mode, setMode] = useState<AuthMode>("login");
   const [setupAvailable, setSetupAvailable] = useState(false);
   const [username, setUsername] = useState("");
@@ -33,18 +38,16 @@ function AuthPage() {
 
   useEffect(() => {
     let active = true;
-    void supabase.functions.invoke<{ adminCount?: number }>("username-login", {
-      body: { action: "status" },
-    }).then(({ data, error }) => {
-      if (!active || error) return;
-      const available = canCreateFirstAdmin(data?.adminCount);
+    void getStatus().then((data) => {
+      if (!active) return;
+      const available = canCreateFirstAdmin(data.adminCount);
       setSetupAvailable(available);
       if (available) setMode("setup");
-    });
+    }).catch(() => { /* Fail closed on an unavailable administrator count. */ });
     return () => {
       active = false;
     };
-  }, []);
+  }, [getStatus]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -53,34 +56,34 @@ function AuthPage() {
       return;
     }
 
+    const schema = mode === "setup" ? setupCredentialsSchema : loginCredentialsSchema;
+    if (!schema.safeParse({ username, password }).success) {
+      toast.error(INVALID_CREDENTIALS);
+      return;
+    }
     setBusy(true);
-    const { data, error } = await supabase.functions.invoke<{
-      session?: { access_token: string; refresh_token: string };
-      error?: string;
-    }>("username-login", {
-      body: {
-        action: mode === "setup" ? "bootstrap" : "login",
-        username,
-        password,
-      },
-    });
-
-    if (error || !data?.session) {
+    try {
+      const data = await login({ data: {
+        action: mode === "setup" ? "bootstrap" : "login", username, password,
+      } });
+      if (!("session" in data)) {
+        toast.error(INVALID_CREDENTIALS);
+        return;
+      }
+      const { error: sessionError } = await supabase.auth.setSession(data.session);
+      if (sessionError) {
+        toast.error("Não foi possível iniciar a sessão. Tente novamente.");
+        return;
+      }
+      setPassword("");
+      setConfirmPassword("");
+      if (mode === "setup") toast.success("Primeiro administrador criado com sucesso.");
+      await navigate({ to: "/" });
+    } catch {
+      toast.error(INVALID_CREDENTIALS);
+    } finally {
       setBusy(false);
-      toast.error(data?.error ?? (mode === "setup"
-        ? "Não foi possível criar o primeiro administrador. Verifique os dados e tente novamente."
-        : "Nome de utilizador ou palavra-passe inválidos."));
-      return;
     }
-
-    const { error: sessionError } = await supabase.auth.setSession(data.session);
-    setBusy(false);
-    if (sessionError) {
-      toast.error("Não foi possível iniciar a sessão. Tente novamente.");
-      return;
-    }
-    if (mode === "setup") toast.success("Primeiro administrador criado com sucesso.");
-    navigate({ to: "/" });
   }
 
   const isSetup = mode === "setup";
@@ -99,6 +102,10 @@ function AuthPage() {
         <Input
           type="text"
           placeholder="Nome de utilizador"
+          aria-label="Nome de utilizador"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
           autoComplete="username"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
@@ -111,6 +118,7 @@ function AuthPage() {
         <Input
           type="password"
           placeholder="Palavra-passe"
+          aria-label="Palavra-passe"
           autoComplete={isSetup ? "new-password" : "current-password"}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
@@ -121,6 +129,7 @@ function AuthPage() {
           <Input
             type="password"
             placeholder="Confirmar palavra-passe"
+            aria-label="Confirmar palavra-passe"
             autoComplete="new-password"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}

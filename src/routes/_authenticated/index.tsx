@@ -17,7 +17,14 @@ type AppUser = { id: string; username: string; isAdmin: boolean; active: boolean
 type Page = "home" | "dashboard" | "orders" | "routes" | "catalog" | "companies" | "users" | "history";
 
 export const Route = createFileRoute("/_authenticated/")({
-  head: () => ({ meta: [{ title: "Maxi Armazém | Encomendas e Rotas" }] }),
+  head: () => ({ meta: [
+    { title: "Maxi Armazém | Encomendas e Rotas" },
+    { name: "description", content: "Gestão de encomendas, catálogo e rotas da equipa Maxi Armazém." },
+    { property: "og:title", content: "Maxi Armazém | Encomendas e Rotas" },
+    { property: "og:description", content: "Gestão de encomendas, catálogo e rotas da equipa Maxi Armazém." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+  ] }),
   component: Workspace,
 });
 
