@@ -4,8 +4,8 @@ A primeira conta administrativa é criada manualmente no Supabase. Não colocar 
 
 ## Pré-requisitos
 
-1. Aplicar a migração `0007_user_profiles_and_admin_policies.sql`.
-2. Publicar as Edge Functions `username-login` e `manage-users`.
+1. Aplicar as migrações `0007_user_profiles_and_admin_policies.sql` e `0008_orders_products_and_daily_routes.sql`, por esta ordem.
+2. Publicar as Edge Functions `username-login` e `manage-users` (incluindo a acção `list` para o painel de utilizadores).
 3. Confirmar que as funções têm acesso às variáveis de ambiente padrão do Supabase, incluindo `SUPABASE_URL`, `SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY`.
 
 ## Criar a conta
