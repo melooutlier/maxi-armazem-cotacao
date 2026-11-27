@@ -26,6 +26,35 @@ Deno.serve(async (req) => {
 
     const body = await req.json();
     const action = String(body.action ?? "");
+    if (action === "list") {
+      const [{ data: profiles, error: profilesError }, { data: roleRows, error: rolesError }, { data: authUsers, error: usersError }] = await Promise.all([
+        admin.from("user_profiles").select("user_id, username, created_at").order("username"),
+        admin.from("user_roles").select("user_id, role"),
+        admin.auth.admin.listUsers({ page: 1, perPage: 1000 }),
+      ]);
+      if (profilesError || rolesError || usersError) {
+        return Response.json({ error: profilesError?.message ?? rolesError?.message ?? usersError?.message ?? "Não foi possível listar as contas." }, { status: 400, headers: corsHeaders });
+      }
+      const rolesByUser = new Map<string, string[]>();
+      for (const row of roleRows ?? []) {
+        const current = rolesByUser.get(row.user_id) ?? [];
+        current.push(row.role);
+        rolesByUser.set(row.user_id, current);
+      }
+      const authById = new Map((authUsers?.users ?? []).map((user) => [user.id, user]));
+      const users = (profiles ?? []).map((profile) => {
+        const authUser = authById.get(profile.user_id);
+        return {
+          id: profile.user_id,
+          username: profile.username,
+          createdAt: profile.created_at,
+          isAdmin: (rolesByUser.get(profile.user_id) ?? []).includes("admin"),
+          active: !authUser?.banned_until || new Date(authUser.banned_until) <= new Date(),
+        };
+      });
+      return Response.json({ users }, { headers: corsHeaders });
+    }
+
     if (action === "create") {
       const username = String(body.username ?? "").trim().toLowerCase();
       const password = String(body.password ?? "");
