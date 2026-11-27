@@ -131,19 +131,23 @@ function Workspace() {
     if (!companyId) { toast.error("Seleccione a empresa da encomenda."); return; }
     if (!cart.length) { toast.error("Adicione pelo menos um produto."); return; }
     setBusy(true);
+    let draftOrderId: string | null = null;
     try {
       const { data: order, error } = await supabase.from("orders").insert({ company_id: companyId, created_by: userId, status: "draft" }).select().single();
       if (error) throw error;
+      draftOrderId = order.id;
       const rows = cart.map(({ product, quantity }) => ({ order_id: order.id, product_id: product.id, product_code: product.code, product_name: product.name, unit: product.unit, quantity }));
       const { error: itemsError } = await supabase.from("order_items").insert(rows);
       if (itemsError) throw itemsError;
       const { error: submitError } = await supabase.from("orders").update({ status: "submitted" }).eq("id", order.id);
       if (submitError) throw submitError;
+      draftOrderId = null;
       setCart([]); setCompanyId(""); setPage("history");
       toast.success("Encomenda guardada com sucesso.");
       await loadData();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Não foi possível finalizar a encomenda. O rascunho poderá precisar de revisão.");
+      if (draftOrderId) await supabase.from("orders").delete().eq("id", draftOrderId);
+      toast.error(error instanceof Error ? error.message : "Não foi possível finalizar a encomenda.");
       await loadData();
     } finally { setBusy(false); }
   }
