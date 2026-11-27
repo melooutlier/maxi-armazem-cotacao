@@ -152,7 +152,7 @@ function Workspace() {
       const { error: submitError } = await supabase.from("orders").update({ status: "submitted" }).eq("id", order.id);
       if (submitError) throw submitError;
       draftOrderId = null;
-      setCart([]); setCompanyId(""); setPage("history");
+      setCart([]); setCompanyId(""); setCartOpen(false); setPage("history");
       toast.success("Encomenda guardada com sucesso.");
       await loadData();
     } catch (error) {
