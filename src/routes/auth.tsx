@@ -60,7 +60,7 @@ function AuthPage() {
     }>("username-login", {
       body: {
         action: mode === "setup" ? "bootstrap" : "login",
-        username: username.trim().toLowerCase(),
+        username: username.trim(),
         password,
       },
     });
@@ -101,7 +101,7 @@ function AuthPage() {
           placeholder="Nome de utilizador"
           autoComplete="username"
           value={username}
-          onChange={(e) => setUsername(e.target.value.toLowerCase())}
+          onChange={(e) => setUsername(e.target.value)}
           required
           minLength={3}
           maxLength={40}
