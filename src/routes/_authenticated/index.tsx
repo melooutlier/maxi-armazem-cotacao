@@ -161,10 +161,10 @@ function Workspace() {
   async function exportOrder(order: Order) {
     const company = companies.find((entry) => entry.id === order.company_id);
     const items = orderItems.filter((item) => item.order_id === order.id);
-    const headers = ["Artigo", "Arm.", "Localização", "Lote", "Descrição", "CIVA", "IVA", "Pr. Unit.", "Desc.", "UN", "Qtd.", "Total Liq.", "Contrato"];
+    const headers = ["Código", "Quantidade"];
     const rows = [headers, ...items.map(item => [
-      item.product_code, "", "", "", item.product_name, "", "", "", "", item.unit,
-      Number(item.quantity.toFixed(2)), "", "",
+      item.product_code,
+      Number(item.quantity.toFixed(2)),
     ])];
     const blob = buildXlsx(rows);
     const url = URL.createObjectURL(blob);
