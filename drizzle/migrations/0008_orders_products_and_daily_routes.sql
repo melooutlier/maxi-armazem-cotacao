@@ -140,6 +140,9 @@ CREATE POLICY "Users update own draft orders" ON public.orders FOR UPDATE TO aut
 DROP POLICY IF EXISTS "Admins delete orders" ON public.orders;
 CREATE POLICY "Admins delete orders" ON public.orders FOR DELETE TO authenticated
   USING (public.has_role(auth.uid(), 'admin'));
+DROP POLICY IF EXISTS "Users delete own draft orders" ON public.orders;
+CREATE POLICY "Users delete own draft orders" ON public.orders FOR DELETE TO authenticated
+  USING (created_by = auth.uid() AND status = 'draft');
 
 DROP POLICY IF EXISTS "Read order items by order access" ON public.order_items;
 CREATE POLICY "Read order items by order access" ON public.order_items FOR SELECT TO authenticated
