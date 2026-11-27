@@ -12,10 +12,10 @@ import { INVALID_CREDENTIALS, loginCredentialsSchema, setupCredentialsSchema } f
 export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
-      { title: "Entrar | Maxi Armazém" },
-      { name: "description", content: "Acesso à plataforma Maxi Armazém." },
-      { property: "og:title", content: "Entrar | Maxi Armazém" },
-      { property: "og:description", content: "Acesso à plataforma Maxi Armazém." },
+      { title: "Entrar | NESPECTIONA" },
+      { name: "description", content: "Acesso ao sistema NESPECTIONA." },
+      { property: "og:title", content: "Entrar | NESPECTIONA" },
+      { property: "og:description", content: "Acesso à plataforma NESPECTIONA." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -92,7 +92,7 @@ function AuthPage() {
     <main className="flex min-h-screen items-center justify-center bg-background px-4 py-8">
       <form onSubmit={submit} className="w-full max-w-sm space-y-4 rounded-lg border bg-card p-6 shadow-sm">
         <div className="space-y-2">
-          <h1 className="text-2xl font-semibold text-foreground">Maxi Armazém</h1>
+          <h1 className="text-2xl font-semibold text-foreground">NESPECTIONA</h1>
           <p className="text-sm text-muted-foreground">
             {isSetup
               ? "Crie a primeira conta de administrador para começar a gerir o sistema."
